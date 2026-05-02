@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>在庫管理アプリ</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.19.1/zxing.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#222}
@@ -51,18 +51,15 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .reg-grid input{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none}
 .reg-grid input:focus{border-color:#4a7cf7}
 .reg-btn{width:100%;padding:12px;font-size:14px;font-weight:600;border-radius:10px;border:1px solid #ddd;cursor:pointer;background:#f5f5f5;color:#333;margin-top:6px}
-.reg-btn:active{background:#e8e8e8}
 .loading{text-align:center;padding:20px;color:#aaa;font-size:13px}
 .sync-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;margin-bottom:12px;font-size:12px;color:#666}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;background:#1D9E75}
 .dot.spin{background:#EF9F27;animation:pulse 1s infinite}
 .dot.err{background:#e24b4a}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-#video-wrap{display:none;position:relative;border-radius:10px;overflow:hidden;margin-bottom:10px;background:#000}
-#video-wrap video{width:100%;display:block;max-height:240px;object-fit:cover}
-.cam-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70%;height:40%;border:2px solid #1D9E75;border-radius:8px;pointer-events:none}
-.close-cam{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer;line-height:32px;text-align:center;z-index:10}
-.cam-hint{text-align:center;font-size:12px;color:#888;margin-bottom:8px;display:none}
+#reader{width:100%;margin-bottom:10px;border-radius:10px;overflow:hidden;display:none}
+#reader video{border-radius:10px}
+.stop-btn{width:100%;padding:10px;font-size:13px;font-weight:500;border-radius:8px;border:1px solid #ddd;background:#fff0f0;color:#e24b4a;cursor:pointer;margin-bottom:10px;display:none}
 </style>
 </head>
 <body>
@@ -84,12 +81,8 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
   <div id="tab-scan">
     <div class="card">
       <div class="section-label">JANコード</div>
-      <div id="video-wrap">
-        <video id="cam" autoplay playsinline muted></video>
-        <div class="cam-overlay"></div>
-        <button class="close-cam" onclick="stopCam()">×</button>
-      </div>
-      <p class="cam-hint" id="cam-hint">緑の枠にバーコードを合わせてください</p>
+      <div id="reader"></div>
+      <button class="stop-btn" id="stop-btn" onclick="stopCam()">📷 カメラを停止</button>
       <div class="scan-area">
         <input type="text" id="jan-input" placeholder="4901234567890" inputmode="numeric" oninput="onJanInput(this.value)" onkeydown="if(event.key==='Enter')lookupJan()"/>
         <button class="scan-btn" id="cam-btn" onclick="startCam()">📷 カメラ</button>
@@ -144,8 +137,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbwL93EXMH-yQel7wa5RC3mjOpUt7P9n3Jd1LI9TcTlp76teW2iGCm0TC8W7jDUpiVaahg/exec';
 let products=[];
-let codeReader=null;
-let scanning=false;
+let html5QrCode=null;
 
 async function api(params){
   const url=GAS_URL+'?'+new URLSearchParams(params).toString();
@@ -333,61 +325,51 @@ async function deleteProduct(jan){
 }
 
 async function startCam(){
-  const wrap=document.getElementById('video-wrap');
-  const hint=document.getElementById('cam-hint');
-  const btn=document.getElementById('cam-btn');
-  wrap.style.display='';
-  hint.style.display='block';
-  btn.textContent='⏹ 停止';
-  btn.onclick=stopCam;
+  document.getElementById('reader').style.display='block';
+  document.getElementById('stop-btn').style.display='block';
+  document.getElementById('cam-btn').style.display='none';
 
   try{
-    // ZXingライブラリを使用
-    if(typeof ZXing!=='undefined'){
-      codeReader=new ZXing.BrowserMultiFormatReader();
-      const devices=await ZXing.BrowserCodeReader.listVideoInputDevices();
-      // 背面カメラを優先
-      const backCam=devices.find(d=>d.label.toLowerCase().includes('back')||d.label.toLowerCase().includes('rear')||d.label.toLowerCase().includes('environment'));
-      const deviceId=backCam?backCam.deviceId:devices[devices.length-1]?.deviceId;
-      scanning=true;
-      await codeReader.decodeFromVideoDevice(deviceId,'cam',(result,err)=>{
-        if(result&&scanning){
-          scanning=false;
-          const code=result.getText();
-          document.getElementById('jan-input').value=code;
-          stopCam();
-          lookupJan();
-          toast('スキャン完了: '+code,'in');
-        }
-      });
-    } else {
-      // フォールバック：getUserMediaのみ
-      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-      document.getElementById('cam').srcObject=stream;
-      toast('バーコードライブラリ読み込み中...','in');
+    html5QrCode=new Html5Qrcode('reader');
+    const devices=await Html5Qrcode.getCameras();
+    if(!devices||devices.length===0){
+      toast('カメラが見つかりません','err');
+      stopCam();
+      return;
     }
+    // 背面カメラを優先
+    const backCam=devices.find(d=>d.label.toLowerCase().includes('back')||d.label.toLowerCase().includes('rear'));
+    const camId=backCam?backCam.id:devices[devices.length-1].id;
+
+    await html5QrCode.start(
+      camId,
+      {fps:10, qrbox:{width:250,height:150}},
+      (code)=>{
+        document.getElementById('jan-input').value=code;
+        stopCam();
+        lookupJan();
+        toast('スキャン完了: '+code,'in');
+      },
+      ()=>{}
+    );
   }catch(e){
     toast('カメラを起動できませんでした','err');
     stopCam();
   }
 }
 
-function stopCam(){
-  scanning=false;
-  if(codeReader){
-    try{codeReader.reset();}catch(e){}
-    codeReader=null;
+async function stopCam(){
+  if(html5QrCode){
+    try{
+      const state=html5QrCode.getState();
+      if(state===2){await html5QrCode.stop();}
+    }catch(e){}
+    html5QrCode=null;
   }
-  const v=document.getElementById('cam');
-  if(v.srcObject){
-    v.srcObject.getTracks().forEach(t=>t.stop());
-    v.srcObject=null;
-  }
-  document.getElementById('video-wrap').style.display='none';
-  document.getElementById('cam-hint').style.display='none';
-  const btn=document.getElementById('cam-btn');
-  btn.textContent='📷 カメラ';
-  btn.onclick=startCam;
+  document.getElementById('reader').style.display='none';
+  document.getElementById('reader').innerHTML='';
+  document.getElementById('stop-btn').style.display='none';
+  document.getElementById('cam-btn').style.display='block';
 }
 
 loadProducts();
