@@ -602,24 +602,25 @@ function startScanLoop(engine){
   const video=document.getElementById('cam-video');
   const canvas=document.getElementById('cam-canvas');
   const ctx=canvas.getContext('2d');
-  let frameCount=0;
+  // iOSのUIをブロックしないよう setInterval で一定間隔処理
+  // nativeは300ms（約3fps）、ZXingは500ms で十分読み取れる
+  const interval=engine==='zxing'?500:300;
+  let scanning=false; // 処理中フラグ（重複実行防止）
 
-  const tick=async()=>{
-    if(!camStream) return;
-    if(video.readyState<2){scanLoop=requestAnimationFrame(tick);return;}
-
-    frameCount++;
-    // ネイティブは毎フレーム、ZXingは2フレームに1回（負荷軽減）
-    const skip=engine==='zxing'?2:1;
-    if(frameCount%skip!==0){scanLoop=requestAnimationFrame(tick);return;}
-
-    // スキャン対象エリア：画面中央70%×40%
-    const vw=video.videoWidth, vh=video.videoHeight;
-    const sx=vw*0.15, sy=vh*0.30, sw=vw*0.70, sh=vh*0.40;
-    canvas.width=sw; canvas.height=sh;
-    ctx.drawImage(video,sx,sy,sw,sh,0,0,sw,sh);
+  scanLoop=setInterval(async()=>{
+    // 前の処理が終わっていない・ストリームが止まっている場合はスキップ
+    if(scanning||!camStream||video.readyState<2) return;
+    scanning=true;
 
     try{
+      // スキャン対象エリア：映像中央 70%×40% を切り出し
+      const vw=video.videoWidth, vh=video.videoHeight;
+      if(!vw||!vh){scanning=false;return;}
+      const sw=Math.floor(vw*0.70), sh=Math.floor(vh*0.40);
+      const sx=Math.floor(vw*0.15), sy=Math.floor(vh*0.30);
+      canvas.width=sw; canvas.height=sh;
+      ctx.drawImage(video,sx,sy,sw,sh,0,0,sw,sh);
+
       let code=null;
       if(engine==='native'){
         const results=await barcodeDetector.detect(canvas);
@@ -628,35 +629,32 @@ function startScanLoop(engine){
         const imgData=ctx.getImageData(0,0,sw,sh);
         const luminance=new ZXing.RGBLuminanceSource(imgData.data,sw,sh);
         const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-        try{
-          const result=zxingReader.decode(bmp);
-          code=result.getText();
-        }catch(e){}
+        try{ code=zxingReader.decode(bmp).getText(); }catch(e){}
       }
 
       if(code){
         const now=Date.now();
-        if(code===lastCode && now-lastCodeTime<2000){
-          scanLoop=requestAnimationFrame(tick);return;
-        }
-        // 数字のみのJANコードか確認（EAN-13: 13桁, EAN-8: 8桁など）
-        const isBarcode=/^[0-9]{6,14}$/.test(code);
-        if(isBarcode){
-          lastCode=code; lastCodeTime=now;
-          document.getElementById('jan-input').value=code;
-          stopCam(); lookupJan();
-          toast('✓ スキャン完了','in');
-          return;
+        // 同じコードを2秒以内に再読みしない
+        if(code!==lastCode || now-lastCodeTime>=2000){
+          // 数字6〜14桁のJAN形式のみ受け付ける
+          if(/^[0-9]{6,14}$/.test(code)){
+            lastCode=code; lastCodeTime=now;
+            document.getElementById('jan-input').value=code;
+            stopCam(); lookupJan();
+            toast('✓ スキャン完了','in');
+            scanning=false;
+            return;
+          }
         }
       }
     }catch(e){}
-    scanLoop=requestAnimationFrame(tick);
-  };
-  scanLoop=requestAnimationFrame(tick);
+
+    scanning=false;
+  }, interval);
 }
 
 function stopCam(){
-  if(scanLoop){cancelAnimationFrame(scanLoop);scanLoop=null;}
+  if(scanLoop){clearInterval(scanLoop);scanLoop=null;}
   if(camStream){
     camStream.getTracks().forEach(t=>t.stop());
     camStream=null;
