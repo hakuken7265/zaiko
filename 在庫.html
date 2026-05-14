@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>在庫管理アプリ</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- ZXing fallback for older iOS -->
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#222}
@@ -51,8 +52,24 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .dot.spin{background:#EF9F27;animation:pulse 1s infinite}
 .dot.err{background:#e24b4a}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-#reader{width:100%;margin-bottom:8px;border-radius:10px;overflow:hidden;display:none}
-#reader__dashboard{display:none !important}
+/* カメラビューア */
+.cam-viewer{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#000;margin-bottom:10px;display:none}
+.cam-viewer video{width:100%;display:block;object-fit:cover}
+.cam-viewer canvas{display:none}
+/* スキャン枠オーバーレイ */
+.scan-overlay{position:absolute;inset:0;pointer-events:none}
+.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;height:38%;border:none}
+.scan-frame::before,.scan-frame::after,
+.scan-corner-bl,.scan-corner-br{content:'';position:absolute;width:22px;height:22px;border-color:#1D9E75;border-style:solid}
+.scan-frame::before{top:0;left:0;border-width:3px 0 0 3px}
+.scan-frame::after{top:0;right:0;border-width:3px 3px 0 0}
+.scan-corner-bl{bottom:0;left:0;border-width:0 0 3px 3px}
+.scan-corner-br{bottom:0;right:0;border-width:0 3px 3px 0}
+/* スキャンライン */
+.scan-line{position:absolute;left:12%;right:12%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.6s ease-in-out infinite}
+@keyframes scanmove{0%,100%{top:30%}50%{top:68%}}
+/* スキャン状態テキスト */
+.cam-status{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.85);font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .stop-btn{width:100%;padding:10px;font-size:13px;font-weight:500;border-radius:8px;border:1px solid #fcc;background:#fff0f0;color:#e24b4a;cursor:pointer;margin-bottom:10px;display:none}
 /* ログイン画面 */
 .login-wrap{position:fixed;inset:0;background:#f5f5f5;display:flex;align-items:center;justify-content:center;z-index:9999}
@@ -131,7 +148,19 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
   <div id="tab-scan">
     <div class="card">
       <div class="section-label">JANコード</div>
-      <div id="reader"></div>
+      <!-- カメラビューア -->
+      <div class="cam-viewer" id="cam-viewer">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <canvas id="cam-canvas"></canvas>
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <div class="scan-corner-bl"></div>
+            <div class="scan-corner-br"></div>
+          </div>
+          <div class="scan-line"></div>
+        </div>
+        <div class="cam-status" id="cam-status">バーコードを枠内に合わせてください</div>
+      </div>
       <button class="stop-btn" id="stop-btn" onclick="stopCam()">■ カメラを停止</button>
       <div class="scan-area">
         <input type="text" id="jan-input" placeholder="4901234567890" inputmode="numeric"
@@ -219,7 +248,6 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbwZBCyD9YMa5-jh4x7q6bnH69eiW1C-90QQygAJKEJniACBStwswCYWNPmGtUgYa_k1pw/exec';
 let products=[];
-let html5QrCode=null;
 let PW='';
 
 // ログイン
@@ -486,74 +514,153 @@ function renderRegList(){
   }).join('');
 }
 
+// ── カメラ・スキャンエンジン ─────────────────────────────────
+let camStream=null;
+let scanLoop=null;
+let barcodeDetector=null;
+let zxingReader=null;
+let lastCode='';
+let lastCodeTime=0;
+
+// 利用可能なスキャンエンジンを初期化
+async function initScanEngine(){
+  // ① ネイティブ BarcodeDetector（iOS17+, Android Chrome）
+  if('BarcodeDetector' in window){
+    try{
+      barcodeDetector=new BarcodeDetector({
+        formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf']
+      });
+      return 'native';
+    }catch(e){}
+  }
+  // ② ZXing fallback（iOS16以下、古いブラウザ）
+  if(window.ZXing){
+    try{
+      const hints=new Map();
+      const fmts=[
+        ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A,
+        ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.CODE_128,
+      ];
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, fmts);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      zxingReader=new ZXing.MultiFormatReader();
+      zxingReader.setHints(hints);
+      return 'zxing';
+    }catch(e){}
+  }
+  return 'none';
+}
+
 async function startCam(){
-  document.getElementById('reader').style.display='block';
+  document.getElementById('cam-viewer').style.display='block';
   document.getElementById('stop-btn').style.display='block';
   document.getElementById('cam-btn').style.display='none';
+  document.getElementById('cam-status').textContent='カメラを起動中...';
+
   try{
-    html5QrCode=new Html5Qrcode('reader');
+    // 高解像度で背面カメラを要求（iOSもこれで動作）
+    camStream=await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1280},
+        height:{ideal:720},
+        focusMode:'continuous'
+      },
+      audio:false
+    });
+    const video=document.getElementById('cam-video');
+    video.srcObject=camStream;
+    await video.play();
 
-    // iOSはfacingMode指定が最も確実。Android等はデバイスIDで背面カメラを選択
-    const isIOS=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const engine=await initScanEngine();
+    document.getElementById('cam-status').textContent='バーコードを枠内に合わせてください';
 
-    const config={
-      fps:10,                          // iOSは低fps安定読み取り
-      qrbox:{width:260,height:130},    // 認識エリアを小さく絞ると精度向上
-      aspectRatio:1.7,
-      // experimentalFeatures は iOS Safari で誤動作するため除外
-      formatsToSupport:[
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-      ]
-    };
+    // canvasをvideoと同サイズに設定
+    const canvas=document.getElementById('cam-canvas');
+    video.addEventListener('loadedmetadata',()=>{
+      canvas.width=video.videoWidth;
+      canvas.height=video.videoHeight;
+    },{once:true});
 
-    // 同一コードの誤連続読み取りを防ぐ
-    let lastCode='';
-    let lastTime=0;
-
-    const onSuccess=(code)=>{
-      const now=Date.now();
-      // 同じコードを1秒以内に再読みしない
-      if(code===lastCode && now-lastTime<1000) return;
-      lastCode=code; lastTime=now;
-      document.getElementById('jan-input').value=code;
-      stopCam(); lookupJan();
-      toast('スキャン完了: '+code,'in');
-    };
-
-    if(isIOS){
-      // iOSはfacingMode:'environment'でSafariカメラを直接起動
-      await html5QrCode.start(
-        {facingMode:'environment'},
-        config,
-        onSuccess, ()=>{}
-      );
-    } else {
-      // Android等はデバイス一覧から背面カメラを選択
-      const devices=await Html5Qrcode.getCameras();
-      if(!devices||devices.length===0){toast('カメラが見つかりません','err');stopCam();return;}
-      const backCam=devices.find(d=>
-        d.label.toLowerCase().includes('back')||
-        d.label.toLowerCase().includes('rear')||
-        d.label.toLowerCase().includes('environment'));
-      const camId=backCam?backCam.id:devices[devices.length-1].id;
-      await html5QrCode.start(camId, config, onSuccess, ()=>{});
-    }
+    startScanLoop(engine);
   }catch(e){
-    toast('カメラを起動できませんでした','err');stopCam();
+    const msg=e.name==='NotAllowedError'?'カメラのアクセスを許可してください':
+              e.name==='NotFoundError'?'カメラが見つかりません':
+              'カメラを起動できませんでした';
+    toast(msg,'err');
+    stopCam();
   }
 }
 
-async function stopCam(){
-  if(html5QrCode){
-    try{if(html5QrCode.getState()===2)await html5QrCode.stop();}catch(e){}
-    html5QrCode=null;
+function startScanLoop(engine){
+  const video=document.getElementById('cam-video');
+  const canvas=document.getElementById('cam-canvas');
+  const ctx=canvas.getContext('2d');
+  let frameCount=0;
+
+  const tick=async()=>{
+    if(!camStream) return;
+    if(video.readyState<2){scanLoop=requestAnimationFrame(tick);return;}
+
+    frameCount++;
+    // ネイティブは毎フレーム、ZXingは2フレームに1回（負荷軽減）
+    const skip=engine==='zxing'?2:1;
+    if(frameCount%skip!==0){scanLoop=requestAnimationFrame(tick);return;}
+
+    // スキャン対象エリア：画面中央70%×40%
+    const vw=video.videoWidth, vh=video.videoHeight;
+    const sx=vw*0.15, sy=vh*0.30, sw=vw*0.70, sh=vh*0.40;
+    canvas.width=sw; canvas.height=sh;
+    ctx.drawImage(video,sx,sy,sw,sh,0,0,sw,sh);
+
+    try{
+      let code=null;
+      if(engine==='native'){
+        const results=await barcodeDetector.detect(canvas);
+        if(results.length>0) code=results[0].rawValue;
+      } else if(engine==='zxing'){
+        const imgData=ctx.getImageData(0,0,sw,sh);
+        const luminance=new ZXing.RGBLuminanceSource(imgData.data,sw,sh);
+        const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+        try{
+          const result=zxingReader.decode(bmp);
+          code=result.getText();
+        }catch(e){}
+      }
+
+      if(code){
+        const now=Date.now();
+        if(code===lastCode && now-lastCodeTime<2000){
+          scanLoop=requestAnimationFrame(tick);return;
+        }
+        // 数字のみのJANコードか確認（EAN-13: 13桁, EAN-8: 8桁など）
+        const isBarcode=/^[0-9]{6,14}$/.test(code);
+        if(isBarcode){
+          lastCode=code; lastCodeTime=now;
+          document.getElementById('jan-input').value=code;
+          stopCam(); lookupJan();
+          toast('✓ スキャン完了','in');
+          return;
+        }
+      }
+    }catch(e){}
+    scanLoop=requestAnimationFrame(tick);
+  };
+  scanLoop=requestAnimationFrame(tick);
+}
+
+function stopCam(){
+  if(scanLoop){cancelAnimationFrame(scanLoop);scanLoop=null;}
+  if(camStream){
+    camStream.getTracks().forEach(t=>t.stop());
+    camStream=null;
   }
-  document.getElementById('reader').style.display='none';
-  document.getElementById('reader').innerHTML='';
+  const video=document.getElementById('cam-video');
+  video.srcObject=null;
+  document.getElementById('cam-viewer').style.display='none';
   document.getElementById('stop-btn').style.display='none';
   document.getElementById('cam-btn').style.display='block';
 }
