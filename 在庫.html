@@ -53,12 +53,12 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .dot.err{background:#e24b4a}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* カメラビューア */
-.cam-viewer{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#000;margin-bottom:10px;display:none}
-.cam-viewer video{width:100%;display:block;object-fit:cover}
+.cam-viewer{position:relative;width:100%;height:220px;border-radius:10px;overflow:hidden;background:#000;margin-bottom:0;display:none;flex-shrink:0}
+.cam-viewer video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .cam-viewer canvas{display:none}
 /* スキャン枠オーバーレイ */
-.scan-overlay{position:absolute;inset:0;pointer-events:none}
-.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;height:38%;border:none}
+.scan-overlay{position:absolute;inset:0;pointer-events:none;z-index:2}
+.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:72%;height:44%;border:none}
 .scan-frame::before,.scan-frame::after,
 .scan-corner-bl,.scan-corner-br{content:'';position:absolute;width:22px;height:22px;border-color:#1D9E75;border-style:solid}
 .scan-frame::before{top:0;left:0;border-width:3px 0 0 3px}
@@ -66,11 +66,12 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .scan-corner-bl{bottom:0;left:0;border-width:0 0 3px 3px}
 .scan-corner-br{bottom:0;right:0;border-width:0 3px 3px 0}
 /* スキャンライン */
-.scan-line{position:absolute;left:12%;right:12%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.6s ease-in-out infinite}
-@keyframes scanmove{0%,100%{top:30%}50%{top:68%}}
+.scan-line{position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.6s ease-in-out infinite}
+@keyframes scanmove{0%,100%{top:28%}50%{top:66%}}
 /* スキャン状態テキスト */
-.cam-status{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.85);font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.6)}
-.stop-btn{width:100%;padding:10px;font-size:13px;font-weight:500;border-radius:8px;border:1px solid #fcc;background:#fff0f0;color:#e24b4a;cursor:pointer;margin-bottom:10px;display:none}
+.cam-status{position:absolute;bottom:36px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.9);font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.7);z-index:2}
+/* 停止ボタン（ビューア内下部に固定） */
+.stop-btn{position:absolute;bottom:0;left:0;right:0;padding:9px;font-size:13px;font-weight:600;border:none;border-radius:0;background:rgba(0,0,0,.55);color:#ff6b6b;cursor:pointer;z-index:3;display:none;-webkit-tap-highlight-color:transparent}
 /* ログイン画面 */
 .login-wrap{position:fixed;inset:0;background:#f5f5f5;display:flex;align-items:center;justify-content:center;z-index:9999}
 .login-card{background:#fff;border:1px solid #e5e5e5;border-radius:16px;padding:32px 24px;width:320px;text-align:center}
@@ -160,8 +161,8 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
           <div class="scan-line"></div>
         </div>
         <div class="cam-status" id="cam-status">バーコードを枠内に合わせてください</div>
+        <button class="stop-btn" id="stop-btn" onclick="stopCam()">■ カメラを停止</button>
       </div>
-      <button class="stop-btn" id="stop-btn" onclick="stopCam()">■ カメラを停止</button>
       <div class="scan-area">
         <input type="text" id="jan-input" placeholder="4901234567890" inputmode="numeric"
           oninput="onJanInput(this.value)" onkeydown="if(event.key==='Enter')lookupJan()"/>
@@ -555,7 +556,9 @@ async function initScanEngine(){
 }
 
 async function startCam(){
-  document.getElementById('cam-viewer').style.display='block';
+  const viewer=document.getElementById('cam-viewer');
+  viewer.style.display='block';
+  viewer.style.marginBottom='10px';
   document.getElementById('stop-btn').style.display='block';
   document.getElementById('cam-btn').style.display='none';
   document.getElementById('cam-status').textContent='カメラを起動中...';
@@ -660,7 +663,9 @@ function stopCam(){
   }
   const video=document.getElementById('cam-video');
   video.srcObject=null;
-  document.getElementById('cam-viewer').style.display='none';
+  const viewer2=document.getElementById('cam-viewer');
+  viewer2.style.display='none';
+  viewer2.style.marginBottom='0';
   document.getElementById('stop-btn').style.display='none';
   document.getElementById('cam-btn').style.display='block';
 }
