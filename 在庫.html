@@ -58,7 +58,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .cam-viewer canvas{display:none}
 /* スキャン枠オーバーレイ */
 .scan-overlay{position:absolute;inset:0;pointer-events:none;z-index:2}
-.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:72%;height:44%;border:none}
+.scan-frame{position:absolute;top:22%;left:14%;width:72%;height:44%;border:none}
 .scan-frame::before,.scan-frame::after,
 .scan-corner-bl,.scan-corner-br{content:'';position:absolute;width:22px;height:22px;border-color:#1D9E75;border-style:solid}
 .scan-frame::before{top:0;left:0;border-width:3px 0 0 3px}
@@ -66,8 +66,8 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .scan-corner-bl{bottom:0;left:0;border-width:0 0 3px 3px}
 .scan-corner-br{bottom:0;right:0;border-width:0 3px 3px 0}
 /* スキャンライン */
-.scan-line{position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.6s ease-in-out infinite}
-@keyframes scanmove{0%,100%{top:28%}50%{top:66%}}
+.scan-line{position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.8s ease-in-out infinite}
+@keyframes scanmove{0%,100%{top:24%}50%{top:62%}}
 /* スキャン状態テキスト */
 .cam-status{position:absolute;bottom:36px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.9);font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.7);z-index:2}
 /* 停止ボタン（ビューア内下部に固定） */
@@ -540,7 +540,7 @@ async function initScanEngine(){
       const hasEan = supported.includes('ean_13')||supported.includes('ean-13');
       if(hasEan||supported.length>0){
         barcodeDetector=new BarcodeDetector({
-          formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39']
+          formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code','data_matrix']
         });
         return 'native';
       }
@@ -619,7 +619,7 @@ function startQuagga(){
       }
     },
     decoder:{
-      readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'],
+      readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader','qr_code_reader'],
       multiple:false
     },
     locate:true
@@ -636,9 +636,9 @@ function startQuagga(){
 
   Quagga.onDetected(result=>{
     const code=result.codeResult.code;
-    if(!code||!/^[0-9]{6,14}$/.test(code)) return;
+    if(!code||!code.trim()) return;
     const now=Date.now();
-    if(code===lastCode && now-lastCodeTime<2000) return;
+    if(code===lastCode && now-lastCodeTime<2500) return;
     lastCode=code; lastCodeTime=now;
     document.getElementById('jan-input').value=code;
     stopCam(); lookupJan();
@@ -659,12 +659,12 @@ async function scanPhotoFile(input){
   if('BarcodeDetector' in window){
     try{
       const img=await createImageBitmap(await fetch(url).then(r=>r.blob()));
-      const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
+      const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','qr_code','data_matrix']});
       const results=await det.detect(img);
       URL.revokeObjectURL(url);
       if(results.length>0){
         const code=results[0].rawValue;
-        if(/^[0-9]{6,14}$/.test(code)){
+        if(code&&code.trim()){
           document.getElementById('jan-input').value=code;
           lookupJan();
           toast('✓ スキャン完了','in');
@@ -680,14 +680,14 @@ async function scanPhotoFile(input){
     Quagga.decodeSingle({
       src:url,
       numOfWorkers:0,
-      decoder:{readers:['ean_reader','ean_8_reader','upc_reader','code_128_reader']},
+      decoder:{readers:['ean_reader','ean_8_reader','upc_reader','code_128_reader','qr_code_reader']},
       locate:true
     }, result=>{
       URL.revokeObjectURL(url);
       input.value='';
       if(result&&result.codeResult&&result.codeResult.code){
         const code=result.codeResult.code;
-        if(/^[0-9]{6,14}$/.test(code)){
+        if(code&&code.trim()){
           document.getElementById('jan-input').value=code;
           lookupJan();
           toast('✓ スキャン完了','in');
@@ -707,55 +707,43 @@ function startScanLoop(engine){
   const video=document.getElementById('cam-video');
   const canvas=document.getElementById('cam-canvas');
   const ctx=canvas.getContext('2d');
-  // iOSのUIをブロックしないよう setInterval で一定間隔処理
-  // nativeは300ms（約3fps）、ZXingは500ms で十分読み取れる
-  const interval=engine==='zxing'?500:300;
-  let scanning=false; // 処理中フラグ（重複実行防止）
+  let scanning=false;
 
+  // 切り出し比率 = 緑枠CSSと完全一致
+  // .scan-frame { top:22% left:14% width:72% height:44% }
+  const CX=0.14, CY=0.22, CW=0.72, CH=0.44;
+
+  // 600ms間隔（約1.6回/秒）でUI負荷・誤読を抑制
   scanLoop=setInterval(async()=>{
-    // 前の処理が終わっていない・ストリームが止まっている場合はスキップ
     if(scanning||!camStream||video.readyState<2) return;
     scanning=true;
-
     try{
-      // スキャン対象エリア：映像中央 70%×40% を切り出し
       const vw=video.videoWidth, vh=video.videoHeight;
       if(!vw||!vh){scanning=false;return;}
-      const sw=Math.floor(vw*0.70), sh=Math.floor(vh*0.40);
-      const sx=Math.floor(vw*0.15), sy=Math.floor(vh*0.30);
+      const sx=Math.floor(vw*CX), sy=Math.floor(vh*CY);
+      const sw=Math.floor(vw*CW), sh=Math.floor(vh*CH);
       canvas.width=sw; canvas.height=sh;
-      ctx.drawImage(video,sx,sy,sw,sh,0,0,sw,sh);
+      ctx.drawImage(video, sx,sy,sw,sh, 0,0,sw,sh);
 
       let code=null;
       if(engine==='native'){
         const results=await barcodeDetector.detect(canvas);
         if(results.length>0) code=results[0].rawValue;
-      } else if(engine==='zxing'){
-        const imgData=ctx.getImageData(0,0,sw,sh);
-        const luminance=new ZXing.RGBLuminanceSource(imgData.data,sw,sh);
-        const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-        try{ code=zxingReader.decode(bmp).getText(); }catch(e){}
       }
 
-      if(code){
+      if(code&&code.trim()){
         const now=Date.now();
-        // 同じコードを2秒以内に再読みしない
-        if(code!==lastCode || now-lastCodeTime>=2000){
-          // 数字6〜14桁のJAN形式のみ受け付ける
-          if(/^[0-9]{6,14}$/.test(code)){
-            lastCode=code; lastCodeTime=now;
-            document.getElementById('jan-input').value=code;
-            stopCam(); lookupJan();
-            toast('✓ スキャン完了','in');
-            scanning=false;
-            return;
-          }
-        }
+        if(code===lastCode && now-lastCodeTime<2500){scanning=false;return;}
+        lastCode=code; lastCodeTime=now;
+        document.getElementById('jan-input').value=code;
+        stopCam(); lookupJan();
+        toast('✓ スキャン完了','in');
+        scanning=false;
+        return;
       }
     }catch(e){}
-
     scanning=false;
-  }, interval);
+  }, 600);
 }
 
 function stopCam(){
