@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>在庫管理アプリ</title>
-<!-- Quagga2: iOS含む実績あるバーコードライブラリ -->
-<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#222}
@@ -55,10 +54,14 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 /* カメラビューア */
 .cam-viewer{position:relative;width:100%;height:220px;border-radius:10px;overflow:hidden;background:#000;margin-bottom:0;display:none;flex-shrink:0}
 .cam-viewer video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.cam-viewer #qr-reader{position:absolute;inset:0;width:100%!important;border:none!important;}
+.cam-viewer #qr-reader__scan_region{border-radius:0!important;}
+.cam-viewer #qr-reader__scan_region img{display:none!important;}
+.cam-viewer #qr-reader__dashboard{display:none!important;}
 .cam-viewer canvas{display:none}
 /* スキャン枠オーバーレイ */
 .scan-overlay{position:absolute;inset:0;pointer-events:none;z-index:2}
-.scan-frame{position:absolute;top:22%;left:14%;width:72%;height:44%;border:none}
+.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:72%;height:44%;border:none}
 .scan-frame::before,.scan-frame::after,
 .scan-corner-bl,.scan-corner-br{content:'';position:absolute;width:22px;height:22px;border-color:#1D9E75;border-style:solid}
 .scan-frame::before{top:0;left:0;border-width:3px 0 0 3px}
@@ -66,8 +69,8 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .scan-corner-bl{bottom:0;left:0;border-width:0 0 3px 3px}
 .scan-corner-br{bottom:0;right:0;border-width:0 3px 3px 0}
 /* スキャンライン */
-.scan-line{position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.8s ease-in-out infinite}
-@keyframes scanmove{0%,100%{top:24%}50%{top:62%}}
+.scan-line{position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,#1D9E75,transparent);animation:scanmove 1.6s ease-in-out infinite}
+@keyframes scanmove{0%,100%{top:28%}50%{top:66%}}
 /* スキャン状態テキスト */
 .cam-status{position:absolute;bottom:36px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.9);font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.7);z-index:2}
 /* 停止ボタン（ビューア内下部に固定） */
@@ -151,8 +154,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
       <div class="section-label">JANコード</div>
       <!-- カメラビューア -->
       <div class="cam-viewer" id="cam-viewer">
-        <video id="cam-video" autoplay playsinline muted></video>
-        <canvas id="cam-canvas"></canvas>
+        <div id="qr-reader"></div>
         <div class="scan-overlay">
           <div class="scan-frame">
             <div class="scan-corner-bl"></div>
@@ -252,6 +254,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
   </div>
 </div>
 
+<div id="qr-reader-photo" style="display:none"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -524,34 +527,9 @@ function renderRegList(){
 }
 
 // ── カメラ・スキャンエンジン ─────────────────────────────────
-let camStream=null;
-let scanLoop=null;
-let barcodeDetector=null;
-let zxingReader=null;
+let html5QrCode=null;
 let lastCode='';
 let lastCodeTime=0;
-
-// 利用可能なスキャンエンジンを判定
-async function initScanEngine(){
-  // ① ネイティブ BarcodeDetector（Android Chrome / iOS17.4+Safari）
-  if('BarcodeDetector' in window){
-    try{
-      const supported = await BarcodeDetector.getSupportedFormats();
-      const hasEan = supported.includes('ean_13')||supported.includes('ean-13');
-      if(hasEan||supported.length>0){
-        barcodeDetector=new BarcodeDetector({
-          formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code','data_matrix']
-        });
-        return 'native';
-      }
-    }catch(e){}
-  }
-  // ② Quagga2（iOS16以下など）
-  if(window.Quagga){
-    return 'quagga';
-  }
-  return 'none';
-}
 
 async function startCam(){
   document.getElementById('photo-fallback').style.display='none';
@@ -563,39 +541,46 @@ async function startCam(){
   document.getElementById('cam-status').textContent='カメラを起動中...';
 
   try{
-    // 高解像度で背面カメラを要求（iOSもこれで動作）
-    camStream=await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:{ideal:'environment'},
-        width:{ideal:1280},
-        height:{ideal:720},
-        focusMode:'continuous'
-      },
-      audio:false
-    });
-    const video=document.getElementById('cam-video');
-    video.srcObject=camStream;
-    await video.play();
+    html5QrCode=new Html5Qrcode('qr-reader');
 
-    const engine=await initScanEngine();
+    // サポートフォーマット（JAN/QRコード）
+    const formats=[
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.DATA_MATRIX,
+    ];
+
+    // カメラ設定：iOSはfacingModeで直接指定が最も安定
+    const camConfig={
+      fps:8,
+      qrbox:{width:260,height:130},  // 緑枠内を読む（横長）
+      aspectRatio:1.7,
+      formatsToSupport:formats
+      // experimentalFeaturesは除外（iOS誤動作の原因）
+    };
+
+    await html5QrCode.start(
+      {facingMode:'environment'},
+      camConfig,
+      (code)=>{
+        // 同じコードを2.5秒以内に再読みしない
+        const now=Date.now();
+        if(code===lastCode && now-lastCodeTime<2500) return;
+        lastCode=code; lastCodeTime=now;
+        document.getElementById('jan-input').value=code;
+        stopCam(); lookupJan();
+        toast('✓ スキャン完了','in');
+      },
+      ()=>{}  // エラーは無視（フレームごとに未検出エラーが出るため）
+    );
+
     document.getElementById('cam-status').textContent='バーコードを枠内に合わせてください';
 
-    if(engine==='none'){
-      // リアルタイムスキャン不可 → 写真撮影モードに切り替え
-      stopCam();
-      document.getElementById('photo-fallback').style.display='block';
-      document.getElementById('cam-btn').style.display='none';
-      return;
-    }
-
-    if(engine==='quagga'){
-      // Quagga2はvideo要素に直接アタッチ
-      startQuagga();
-      return;
-    }
-
-    // nativeエンジン（BarcodeDetector）
-    startScanLoop(engine);
   }catch(e){
     const msg=e.name==='NotAllowedError'?'カメラのアクセスを許可してください':
               e.name==='NotFoundError'?'カメラが見つかりません':
@@ -605,164 +590,52 @@ async function startCam(){
   }
 }
 
-// Quagga2 でリアルタイムスキャン（iOS16以下フォールバック）
-function startQuagga(){
-  const video=document.getElementById('cam-video');
-  Quagga.init({
-    inputStream:{
-      type:'LiveStream',
-      target:video.parentElement,  // cam-viewer divにアタッチ
-      constraints:{
-        facingMode:'environment',
-        width:{ideal:1280},
-        height:{ideal:720}
+async function stopCam(){
+  if(html5QrCode){
+    try{
+      if(html5QrCode.getState()===Html5QrcodeScannerState.SCANNING||
+         html5QrCode.getState()===Html5QrcodeScannerState.PAUSED){
+        await html5QrCode.stop();
       }
-    },
-    decoder:{
-      readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader','qr_code_reader'],
-      multiple:false
-    },
-    locate:true
-  }, err=>{
-    if(err){
-      // Quaggaも失敗 → 写真撮影モード
-      stopCam();
-      document.getElementById('photo-fallback').style.display='block';
-      document.getElementById('cam-btn').style.display='none';
-      return;
-    }
-    Quagga.start();
-  });
-
-  Quagga.onDetected(result=>{
-    const code=result.codeResult.code;
-    if(!code||!code.trim()) return;
-    const now=Date.now();
-    if(code===lastCode && now-lastCodeTime<2500) return;
-    lastCode=code; lastCodeTime=now;
-    document.getElementById('jan-input').value=code;
-    stopCam(); lookupJan();
-    toast('✓ スキャン完了','in');
-  });
+    }catch(e){}
+    html5QrCode=null;
+  }
+  document.getElementById('qr-reader').innerHTML='';
+  const viewer=document.getElementById('cam-viewer');
+  viewer.style.display='none';
+  viewer.style.marginBottom='0';
+  document.getElementById('stop-btn').style.display='none';
+  if(document.getElementById('photo-fallback').style.display==='none'){
+    document.getElementById('cam-btn').style.display='block';
+  }
 }
 
-// 写真ファイルからバーコードを解析（iOS写真撮影フォールバック）
+// 写真ファイルからバーコードを解析（フォールバック）
 async function scanPhotoFile(input){
   const file=input.files[0];
   if(!file) return;
-  document.getElementById('cam-status') && (document.getElementById('cam-status').textContent='解析中...');
-
-  // BitmapまたはImageで読み込んでBarcodeDetector/Quaggaで解析
   const url=URL.createObjectURL(file);
-
-  // まずBarcodeDetectorを試みる
-  if('BarcodeDetector' in window){
-    try{
-      const img=await createImageBitmap(await fetch(url).then(r=>r.blob()));
-      const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','qr_code','data_matrix']});
-      const results=await det.detect(img);
-      URL.revokeObjectURL(url);
-      if(results.length>0){
-        const code=results[0].rawValue;
-        if(code&&code.trim()){
-          document.getElementById('jan-input').value=code;
-          lookupJan();
-          toast('✓ スキャン完了','in');
-          input.value='';
-          return;
-        }
-      }
-    }catch(e){}
-  }
-
-  // Quagga2 decodeSingleで解析
-  if(window.Quagga){
-    Quagga.decodeSingle({
-      src:url,
-      numOfWorkers:0,
-      decoder:{readers:['ean_reader','ean_8_reader','upc_reader','code_128_reader','qr_code_reader']},
-      locate:true
-    }, result=>{
-      URL.revokeObjectURL(url);
-      input.value='';
-      if(result&&result.codeResult&&result.codeResult.code){
-        const code=result.codeResult.code;
-        if(code&&code.trim()){
-          document.getElementById('jan-input').value=code;
-          lookupJan();
-          toast('✓ スキャン完了','in');
-          return;
-        }
-      }
-      toast('読み取れませんでした。もう一度撮影してください','err');
-    });
-    return;
-  }
-  URL.revokeObjectURL(url);
-  input.value='';
-  toast('読み取れませんでした','err');
-}
-
-function startScanLoop(engine){
-  const video=document.getElementById('cam-video');
-  const canvas=document.getElementById('cam-canvas');
-  const ctx=canvas.getContext('2d');
-  let scanning=false;
-
-  // 切り出し比率 = 緑枠CSSと完全一致
-  // .scan-frame { top:22% left:14% width:72% height:44% }
-  const CX=0.14, CY=0.22, CW=0.72, CH=0.44;
-
-  // 600ms間隔（約1.6回/秒）でUI負荷・誤読を抑制
-  scanLoop=setInterval(async()=>{
-    if(scanning||!camStream||video.readyState<2) return;
-    scanning=true;
-    try{
-      const vw=video.videoWidth, vh=video.videoHeight;
-      if(!vw||!vh){scanning=false;return;}
-      const sx=Math.floor(vw*CX), sy=Math.floor(vh*CY);
-      const sw=Math.floor(vw*CW), sh=Math.floor(vh*CH);
-      canvas.width=sw; canvas.height=sh;
-      ctx.drawImage(video, sx,sy,sw,sh, 0,0,sw,sh);
-
-      let code=null;
-      if(engine==='native'){
-        const results=await barcodeDetector.detect(canvas);
-        if(results.length>0) code=results[0].rawValue;
-      }
-
-      if(code&&code.trim()){
-        const now=Date.now();
-        if(code===lastCode && now-lastCodeTime<2500){scanning=false;return;}
-        lastCode=code; lastCodeTime=now;
-        document.getElementById('jan-input').value=code;
-        stopCam(); lookupJan();
-        toast('✓ スキャン完了','in');
-        scanning=false;
-        return;
-      }
-    }catch(e){}
-    scanning=false;
-  }, 600);
-}
-
-function stopCam(){
-  if(scanLoop){clearInterval(scanLoop);scanLoop=null;}
-  // Quagga停止
-  try{if(window.Quagga)Quagga.stop();}catch(e){}
-  if(camStream){
-    camStream.getTracks().forEach(t=>t.stop());
-    camStream=null;
-  }
-  const video=document.getElementById('cam-video');
-  video.srcObject=null;
-  const viewer2=document.getElementById('cam-viewer');
-  viewer2.style.display='none';
-  viewer2.style.marginBottom='0';
-  document.getElementById('stop-btn').style.display='none';
-  // photo-fallbackが表示中でなければカメラボタンを戻す
-  if(document.getElementById('photo-fallback').style.display==='none'){
-    document.getElementById('cam-btn').style.display='block';
+  const formats=[
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.QR_CODE,
+  ];
+  try{
+    const scanner=new Html5Qrcode('qr-reader-photo');
+    const result=await scanner.scanFileV2(file,true);
+    URL.revokeObjectURL(url);
+    input.value='';
+    if(result&&result.decodedText){
+      document.getElementById('jan-input').value=result.decodedText;
+      lookupJan();
+      toast('✓ スキャン完了','in');
+    }
+  }catch(e){
+    URL.revokeObjectURL(url);
+    input.value='';
+    toast('読み取れませんでした。もう一度撮影してください','err');
   }
 }
 
