@@ -554,14 +554,20 @@ async function startCam(){
       Html5QrcodeSupportedFormats.DATA_MATRIX,
     ];
 
-    // カメラ設定：iOSはfacingModeで直接指定が最も安定
-    // ビューア幅に合わせてqrboxサイズを動的計算
+    // ビューア幅に合わせてqrboxサイズを計算
+    // バーコード（EAN-13）は横長・高さが必要、QRは正方形に近い
+    // → 両方対応できるよう縦を広めに確保
     const viewerW=document.getElementById('cam-viewer').offsetWidth||320;
+    const qbW=Math.floor(viewerW*0.85);  // 幅85%
+    const qbH=Math.floor(viewerW*0.55);  // 高さ55%（バーコード用に広め）
     const camConfig={
-      fps:8,
-      qrbox:{width:Math.floor(viewerW*0.78), height:Math.floor(viewerW*0.38)},
-      aspectRatio:1.7,
-      formatsToSupport:formats
+      fps:15,           // バーコードは高めのfpsが有利
+      qrbox:{width:qbW, height:qbH},
+      // aspectRatioは指定しない（iOSで映像歪みが起きるため）
+      formatsToSupport:formats,
+      experimentalFeatures:{
+        useBarCodeDetectorIfSupported:false  // iOSでは無効化
+      }
     };
 
     await html5QrCode.start(
