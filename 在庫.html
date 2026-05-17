@@ -202,7 +202,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
         </label>
       </div>
       <div class="scan-area">
-        <input type="text" id="jan-input" placeholder="4901234567890" inputmode="numeric"
+        <input type="text" id="jan-input" placeholder="" inputmode="numeric"
           oninput="onJanInput(this.value)" onkeydown="if(event.key==='Enter')lookupJan()"/>
         <button class="scan-btn" id="cam-btn" onclick="startCam()">📷 カメラ</button>
       </div>
@@ -509,6 +509,7 @@ function renderStock(){
         <div class="stock-name">${p.name}</div>
         <div style="color:#aaa;font-size:10px;margin-top:2px">JAN: ${p.jan}</div>
         ${sub?`<div style="color:#aaa;font-size:10px;margin-top:1px">${sub}</div>`:''}
+        ${p.order?`<div style="color:#2255cc;font-size:11px;margin-top:3px;font-weight:500">🛒 ${p.order}</div>`:''}
       </div>
       <div class="stock-num ${low?'low':'ok'}">${p.stock}<span class="stock-label"> 個${low?' ⚠️':''}</span></div>
     </div>`;
@@ -549,6 +550,7 @@ function renderRegList(){
         <div class="stock-name">${p.name}</div>
         <div style="color:#aaa;font-size:10px;margin-top:2px">JAN: ${p.jan}</div>
         ${sub?`<div style="color:#aaa;font-size:10px;margin-top:1px">${sub}</div>`:''}
+        ${p.order?`<div style="color:#2255cc;font-size:11px;margin-top:3px;font-weight:500">🛒 ${p.order}</div>`:''}
       </div>
     </div>`;
   }).join('');
