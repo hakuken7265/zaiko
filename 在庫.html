@@ -38,9 +38,9 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .log-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
 .log-item:last-child{border-bottom:none}
 .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
-.badge.in{background:#e1f5ee;color:#0F6E56}.badge.out{background:#e6f1fb;color:#185FA5}
+.badge.in{background:#e1f5ee;color:#0F6E56}.badge.out{background:#e6f1fb;color:#185FA5}.badge.adjust{background:#fef3e2;color:#b35c00}
 .log-info{flex:1}.log-name{font-weight:500}.log-meta{color:#888;font-size:12px;margin-top:1px}
-.log-qty{font-weight:600;font-size:14px}.log-qty.in{color:#1D9E75}.log-qty.out{color:#378ADD}
+.log-qty{font-weight:600;font-size:14px}.log-qty.in{color:#1D9E75}.log-qty.out{color:#378ADD}.log-qty.adjust{color:#b35c00}
 .stock-item{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0;gap:10px}
 .stock-item:last-child{border-bottom:none}
 .stock-info{flex:1}.stock-name{font-weight:500;font-size:14px}.stock-sub{color:#888;font-size:12px;margin-top:1px}
@@ -548,13 +548,18 @@ async function loadAndRenderLog(){
     if(!logs.length){el.innerHTML='<div class="empty">履歴がまだありません</div>';return;}
     el.innerHTML=logs.map(l=>{
       const sub=[l.category1,l.category2].filter(Boolean).join(' / ');
+      const isAdjust=l.type==='adjust';
+      const badgeLabel=l.type==='in'?'入庫':isAdjust?'棚卸修正':'出庫';
+      const qtyLabel=isAdjust
+        ?(String(l.qty).startsWith('-')?l.qty:'+'+l.qty)
+        :(l.type==='in'?'+':'-')+l.qty;
       return`<div class="log-item">
-        <span class="badge ${l.type}">${l.type==='in'?'入庫':'出庫'}</span>
+        <span class="badge ${l.type}">${badgeLabel}</span>
         <div class="log-info">
           <div class="log-name">${l.name}${sub?' <span style="color:#bbb;font-size:11px">'+sub+'</span>':''}</div>
           <div class="log-meta">${l.time}　在庫: ${l.stock}</div>
         </div>
-        <div class="log-qty ${l.type}">${l.type==='in'?'+':'-'}${l.qty}</div>
+        <div class="log-qty ${l.type}">${qtyLabel}</div>
       </div>`;
     }).join('');
   }catch(e){
