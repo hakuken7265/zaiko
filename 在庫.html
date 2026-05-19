@@ -146,6 +146,26 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .picker-filter-row label{font-size:12px;color:#888;min-width:30px;flex-shrink:0}
 .picker-filter-row select{flex:1;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;color:#222;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23999' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
 .picker-filter-row select:focus{border-color:#4a7cf7}
+/* 棚卸修正モーダル */
+.adjust-wrap{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:9000}
+.adjust-wrap.open{display:flex}
+.adjust-card{background:#fff;width:90%;max-width:360px;border-radius:16px;padding:22px 20px;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.adjust-title{font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
+.adjust-name{font-size:13px;color:#555;margin-bottom:14px;line-height:1.4}
+.adjust-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.adjust-row label{font-size:13px;color:#555;white-space:nowrap}
+.adjust-row input{flex:1;padding:10px;font-size:18px;font-weight:700;border:2px solid #ddd;border-radius:8px;text-align:center;outline:none}
+.adjust-row input:focus{border-color:#1D9E75}
+.adjust-diff{font-size:13px;color:#888;margin-bottom:16px;min-height:20px}
+.adjust-diff.plus{color:#1D9E75;font-weight:600}
+.adjust-diff.minus{color:#e24b4a;font-weight:600}
+.adjust-btns{display:flex;gap:8px}
+.adjust-btns button{flex:1;padding:11px;font-size:14px;font-weight:600;border:none;border-radius:10px;cursor:pointer}
+.adjust-cancel{background:#f0f0f0;color:#555}
+.adjust-ok{background:#1D9E75;color:#fff}
+.adjust-ok:disabled{opacity:.5}
+.adj-btn{font-size:11px;padding:3px 8px;border:1px solid #bbb;border-radius:6px;background:#f5f5f5;color:#555;cursor:pointer;margin-top:4px;white-space:nowrap}
+.adj-btn:active{opacity:.7}
 </style>
 </head>
 <body>
@@ -511,7 +531,10 @@ function renderStock(){
         ${sub?`<div style="color:#aaa;font-size:10px;margin-top:1px">${sub}</div>`:''}
         ${p.order?`<div style="color:#2255cc;font-size:11px;margin-top:3px;font-weight:500">🛒 ${p.order}</div>`:''}
       </div>
-      <div class="stock-num ${low?'low':'ok'}">${p.stock}<span class="stock-label"> 個${low?' ⚠️':''}</span></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div class="stock-num ${low?'low':'ok'}">${p.stock}<span class="stock-label"> 個${low?' ⚠️':''}</span></div>
+        <button class="adj-btn" onclick="openAdjust('${p.jan}')">📋 棚卸修正</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -916,6 +939,82 @@ function selectProduct(jan){
     document.getElementById('qty-input').focus();
     document.getElementById('qty-input').select();
   }, 80);
+}
+</script>
+
+<!-- 棚卸修正モーダル -->
+<div class="adjust-wrap" id="adjust-wrap" onclick="if(event.target===this)closeAdjust()">
+  <div class="adjust-card">
+    <div class="adjust-title">📋 棚卸修正</div>
+    <div class="adjust-name" id="adjust-name"></div>
+    <div class="adjust-row">
+      <label>実棚数</label>
+      <input type="number" id="adjust-input" min="0" value="0" oninput="updateAdjustDiff()"/>
+      <span style="font-size:13px;color:#555">個</span>
+    </div>
+    <div class="adjust-diff" id="adjust-diff"></div>
+    <div class="adjust-btns">
+      <button class="adjust-cancel" onclick="closeAdjust()">キャンセル</button>
+      <button class="adjust-ok" id="adjust-ok" onclick="doAdjust()">修正する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 棚卸修正 ──────────────────────────────────────────────────
+let adjustJan = null;
+
+function openAdjust(jan) {
+  const p = products.find(p => p.jan === jan);
+  if (!p) return;
+  adjustJan = jan;
+  document.getElementById('adjust-name').textContent = p.name + '　現在庫: ' + p.stock + '個';
+  document.getElementById('adjust-input').value = p.stock;
+  updateAdjustDiff();
+  document.getElementById('adjust-wrap').classList.add('open');
+  document.getElementById('adjust-input').focus();
+}
+
+function closeAdjust() {
+  adjustJan = null;
+  document.getElementById('adjust-wrap').classList.remove('open');
+}
+
+function updateAdjustDiff() {
+  if (!adjustJan) return;
+  const p = products.find(p => p.jan === adjustJan);
+  const newVal = parseInt(document.getElementById('adjust-input').value);
+  const diff = newVal - p.stock;
+  const el = document.getElementById('adjust-diff');
+  if (isNaN(newVal) || newVal < 0) {
+    el.textContent = ''; el.className = 'adjust-diff';
+    document.getElementById('adjust-ok').disabled = true;
+    return;
+  }
+  document.getElementById('adjust-ok').disabled = false;
+  if (diff === 0) { el.textContent = '変更なし'; el.className = 'adjust-diff'; }
+  else if (diff > 0) { el.textContent = '▲ +' + diff + '個 増加'; el.className = 'adjust-diff plus'; }
+  else { el.textContent = '▼ ' + diff + '個 減少'; el.className = 'adjust-diff minus'; }
+}
+
+async function doAdjust() {
+  const newVal = parseInt(document.getElementById('adjust-input').value);
+  if (isNaN(newVal) || newVal < 0 || !adjustJan) return;
+  const p = products.find(p => p.jan === adjustJan);
+  if (newVal === p.stock) { closeAdjust(); return; }
+  document.getElementById('adjust-ok').disabled = true;
+  try {
+    const data = await api({ action: 'adjust', jan: adjustJan, stock: newVal });
+    if (data.error) { toast(data.error, 'err'); }
+    else {
+      toast(p.name + ' 棚卸修正: ' + p.stock + '→' + newVal + '個', 'in');
+      closeAdjust();
+      await loadProducts();
+    }
+  } catch(e) {
+    toast('通信エラーが発生しました', 'err');
+  }
+  document.getElementById('adjust-ok').disabled = false;
 }
 </script>
 </body>
