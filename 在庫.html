@@ -166,6 +166,8 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .adjust-ok:disabled{opacity:.5}
 .adj-btn{font-size:11px;padding:3px 8px;border:1px solid #bbb;border-radius:6px;background:#f5f5f5;color:#555;cursor:pointer;margin-top:4px;white-space:nowrap}
 .adj-btn:active{opacity:.7}
+.cancel-btn{font-size:11px;padding:3px 8px;border:1px solid #e24b4a;border-radius:6px;background:#fff5f5;color:#e24b4a;cursor:pointer;white-space:nowrap;margin-top:3px}
+.cancel-btn:active{opacity:.7}
 </style>
 </head>
 <body>
@@ -546,6 +548,7 @@ async function loadAndRenderLog(){
     const data=await api({action:'getLogs'});
     const logs=data.logs||[];
     if(!logs.length){el.innerHTML='<div class="empty">履歴がまだありません</div>';return;}
+    const now=Date.now();
     el.innerHTML=logs.map(l=>{
       const sub=[l.category1,l.category2].filter(Boolean).join(' / ');
       const isAdjust=l.type==='adjust';
@@ -553,13 +556,19 @@ async function loadAndRenderLog(){
       const qtyLabel=isAdjust
         ?(String(l.qty).startsWith('-')?l.qty:'+'+l.qty)
         :(l.type==='in'?'+':'-')+l.qty;
+      // 24時間以内かつ入出庫のみ取消ボタンを表示
+      const logTime=new Date(l.time).getTime();
+      const canCancel=!isAdjust&&(now-logTime)<24*60*60*1000;
       return`<div class="log-item">
         <span class="badge ${l.type}">${badgeLabel}</span>
         <div class="log-info">
           <div class="log-name">${l.name}${sub?' <span style="color:#bbb;font-size:11px">'+sub+'</span>':''}</div>
           <div class="log-meta">${l.time}　在庫: ${l.stock}</div>
         </div>
-        <div class="log-qty ${l.type}">${qtyLabel}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+          <div class="log-qty ${l.type}">${qtyLabel}</div>
+          ${canCancel?`<button class="cancel-btn" onclick="cancelLog(${l.rowIndex},'${l.name}','${l.type}',${l.qty})">取消</button>`:''}
+        </div>
       </div>`;
     }).join('');
   }catch(e){
@@ -1020,6 +1029,22 @@ async function doAdjust() {
     toast('通信エラーが発生しました', 'err');
   }
   document.getElementById('adjust-ok').disabled = false;
+}
+</script>
+<script>
+// ── 入出庫取消 ──────────────────────────────────────────────
+async function cancelLog(rowIndex, name, type, qty) {
+  const typeLabel = type === 'in' ? '入庫' : '出庫';
+  if (!confirm(name + ' の' + typeLabel + '（' + qty + '個）を取り消しますか？\n在庫を元に戻し、履歴から削除します。')) return;
+  try {
+    const data = await api({ action: 'cancelLog', rowIndex });
+    if (data.error) { toast(data.error, 'err'); return; }
+    toast(name + ' の' + typeLabel + 'を取り消しました', 'out');
+    await loadProducts();
+    await loadAndRenderLog();
+  } catch(e) {
+    toast('通信エラーが発生しました', 'err');
+  }
 }
 </script>
 </body>
