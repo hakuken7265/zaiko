@@ -444,6 +444,8 @@ async function doRecord(type){
     if(data.error){toast(data.error,'err');setSync('ok','スプレッドシート連携中');}
     else{
       toast(data.name+' '+(type==='in'?'入庫':'出庫')+' '+qty+'個（在庫: '+data.stock+'）',type);
+      if(data.stock<=data.safe)
+        setTimeout(()=>toast('⚠️ '+data.name+' 要発注！（在庫: '+data.stock+'個 / 発注ライン: '+data.safe+'個）','err'),800);
       document.getElementById('jan-input').value='';
       document.getElementById('qty-input').value='1';
       setSelectedBox(null);
