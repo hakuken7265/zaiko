@@ -46,6 +46,12 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .stock-info{flex:1}.stock-name{font-weight:500;font-size:14px}.stock-sub{color:#888;font-size:12px;margin-top:1px}
 .stock-num{font-size:16px;font-weight:600;text-align:right}.stock-num.ok{color:#1D9E75}.stock-num.low{color:#e24b4a}
 .stock-label{font-size:11px;font-weight:400;color:#888}
+/* 在庫一覧 項目グループ見出し */
+.group-head{display:flex;align-items:center;gap:8px;padding:9px 4px 7px;margin-top:14px;border-bottom:2px solid #d9efe6;position:sticky;top:0;background:#fff;z-index:5}
+.group-head:first-child{margin-top:0}
+.group-icon{font-size:16px;line-height:1}
+.group-name{font-size:14px;font-weight:700;color:#0F6E56;flex:1}
+.group-count{font-size:11px;color:#0F6E56;background:#eef6f2;padding:2px 9px;border-radius:20px;font-weight:600}
 .empty{text-align:center;padding:28px;color:#aaa;font-size:13px}
 .loading{text-align:center;padding:20px;color:#aaa;font-size:13px}
 .sync-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;margin-bottom:12px;font-size:12px;color:#666}
@@ -499,7 +505,16 @@ function buildCat2Options(cat1){
   });
 }
 
-/* 在庫一覧を描画（フィルター適用） */
+/* 項目（category1）ごとのアイコン。未定義は📦 */
+const CATEGORY_ICONS={
+  'A1c':'🅰️','HISCL':'🧪','その他':'📦','ドライケム':'🧫','プリンター':'🖨️',
+  '一般':'📋','凝固':'🩹','血液ガス':'💨','血液像':'🔬','血型・輸血':'🆎',
+  '血算':'🩸','血算(ﾊﾞｯｸｱｯﾌﾟ)':'🩸','血糖':'🍬','純水装置':'💧','生化学':'⚗️',
+  '中和装置':'♻️','尿':'🚽','病理':'🧬','薬剤':'💊','用手法':'✋'
+};
+function catIcon(c){return CATEGORY_ICONS[c]||'📦';}
+
+/* 在庫一覧を描画（フィルター適用・項目ごとにグループ化） */
 function renderStock(){
   const cat1=document.getElementById('filter-cat1').value;
   const cat2=document.getElementById('filter-cat2').value;
@@ -525,10 +540,32 @@ function renderStock(){
     el.innerHTML='<div class="empty">該当する商品がありません</div>';
     return;
   }
-  el.innerHTML=filtered.map(p=>{
+
+  // 項目→種類→商品名の順でソート
+  const sorted=[...filtered].sort((a,b)=>{
+    const c1=(a.category1||'').localeCompare(b.category1||'','ja');
+    if(c1!==0)return c1;
+    const c2=(a.category2||'').localeCompare(b.category2||'','ja');
+    if(c2!==0)return c2;
+    return (a.name||'').localeCompare(b.name||'','ja');
+  });
+
+  // 項目ごとの件数を集計
+  const counts={};
+  sorted.forEach(p=>{const c=p.category1||'（未分類）';counts[c]=(counts[c]||0)+1;});
+
+  // 項目（category1）ごとにグループ見出しを挟んで描画
+  let html='';
+  let currentCat=null;
+  sorted.forEach(p=>{
+    const c1=p.category1||'（未分類）';
+    if(c1!==currentCat){
+      currentCat=c1;
+      html+=`<div class="group-head"><span class="group-icon">${catIcon(p.category1)}</span><span class="group-name">${c1}</span><span class="group-count">${counts[c1]}</span></div>`;
+    }
     const low=p.stock<=p.safe;
-    const sub=[p.category1,p.category2,p.spec].filter(Boolean).join(' / ');
-    return`<div class="stock-item">
+    const sub=[p.category2,p.spec].filter(Boolean).join(' / ');
+    html+=`<div class="stock-item">
       <div class="stock-info">
         <div class="stock-name">${p.name}</div>
         <div style="color:#aaa;font-size:10px;margin-top:2px">JAN: ${p.jan}</div>
@@ -540,7 +577,8 @@ function renderStock(){
         <button class="adj-btn" onclick="openAdjust('${p.jan}')">📋 棚卸修正</button>
       </div>
     </div>`;
-  }).join('');
+  });
+  el.innerHTML=html;
 }
 
 async function loadAndRenderLog(){
