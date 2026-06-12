@@ -13,7 +13,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .app{max-width:480px;margin:0 auto;padding:12px}
 h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:center}
 .tabs{display:flex;border:1px solid #ddd;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff}
-.tab{flex:1;padding:10px 4px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;background:#fff;color:#888;border:none}
+.tab{flex:1;padding:10px 2px;font-size:12px;font-weight:500;text-align:center;cursor:pointer;background:#fff;color:#888;border:none;white-space:nowrap}
 .tab.active{background:#f0f4ff;color:#2255cc}
 .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px;margin-bottom:12px}
 .section-label{font-size:12px;color:#888;margin-bottom:6px}
@@ -172,6 +172,55 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .adjust-ok:disabled{opacity:.5}
 .adj-btn{font-size:11px;padding:3px 8px;border:1px solid #bbb;border-radius:6px;background:#f5f5f5;color:#555;cursor:pointer;margin-top:4px;white-space:nowrap}
 .adj-btn:active{opacity:.7}
+/* ── 有効期限管理 ── */
+.exp-summary{display:flex;gap:8px;margin-bottom:12px}
+.exp-stat{flex:1;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:9px 4px;text-align:center}
+.exp-stat .num{font-size:21px;font-weight:700;line-height:1}
+.exp-stat .lbl{font-size:11px;color:#888;margin-top:3px}
+.exp-stat.warn .num{color:#b35c00}.exp-stat.danger .num{color:#e24b4a}.exp-stat.ok .num{color:#1D9E75}
+.exp-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0}
+.exp-item:last-child{border-bottom:none}
+.exp-info{flex:1;min-width:0}
+.exp-name{font-weight:600;font-size:14px}
+.exp-meta{color:#aaa;font-size:11px;margin-top:2px}
+.exp-date{font-size:12px;margin-top:3px;color:#444}
+.exp-date .sub{color:#888}
+.exp-daysbadge{flex-shrink:0;padding:4px 9px;border-radius:20px;font-size:12px;font-weight:700;text-align:center;min-width:62px}
+.exp-daysbadge.danger{background:#fde8e7;color:#e24b4a}
+.exp-daysbadge.warn{background:#fef3e2;color:#b35c00}
+.exp-daysbadge.ok{background:#e1f5ee;color:#0F6E56}
+.exp-daysbadge.none{background:#f0f0f0;color:#999}
+.exp-toggle{width:100%;padding:11px;margin-bottom:12px;background:#f5f7fa;border:1px solid #e0e4ea;border-radius:10px;font-size:13px;font-weight:600;color:#555;cursor:pointer;text-align:center}
+.exp-toggle:active{opacity:.7}
+.exp-section-label{font-size:12px;font-weight:700;color:#888;margin:10px 0 4px;padding-left:2px}
+.edit-btn{flex-shrink:0;font-size:11px;padding:5px 11px;border:1px solid #1D9E75;border-radius:8px;background:#fff;color:#1D9E75;font-weight:600;cursor:pointer}
+.edit-btn:active{opacity:.7}
+.add-reagent-btn{width:100%;padding:12px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px}
+.add-reagent-btn:active{opacity:.85}
+/* 試薬編集モーダル */
+.rg-wrap{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:9000}
+.rg-wrap.open{display:flex}
+.rg-card{background:#fff;width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:20px;max-height:92vh;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.18)}
+@media(min-width:520px){.rg-wrap{align-items:center}.rg-card{border-radius:16px}}
+.rg-title{font-size:16px;font-weight:700;margin-bottom:14px}
+.rg-field{margin-bottom:12px}
+.rg-field label{display:block;font-size:12px;color:#888;margin-bottom:4px}
+.rg-field input,.rg-field select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;background:#fff;color:#222;box-sizing:border-box}
+.rg-field input:focus,.rg-field select:focus{border-color:#1D9E75}
+.rg-row2{display:flex;gap:8px}.rg-row2 .rg-field{flex:1}
+.rg-btns{display:flex;gap:8px;margin-top:6px}
+.rg-btns button{flex:1;padding:12px;font-size:14px;font-weight:600;border:none;border-radius:10px;cursor:pointer}
+.rg-cancel{background:#f0f0f0;color:#555}.rg-save{background:#1D9E75;color:#fff}.rg-save:disabled{opacity:.5}
+.rg-delete{background:#fff;color:#e24b4a;border:1px solid #e24b4a}
+/* マスタ管理 */
+.master-group{margin-bottom:14px}
+.master-group h4{font-size:13px;color:#555;margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:#eef6f2;color:#0F6E56;border-radius:20px;padding:5px 6px 5px 11px;font-size:12px;font-weight:600}
+.chip button{background:#cfe6db;color:#0F6E56;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0}
+.master-add{display:flex;gap:6px}
+.master-add input{flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none}
+.master-add button{padding:8px 14px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .cancel-btn{font-size:11px;padding:3px 8px;border:1px solid #e24b4a;border-radius:6px;background:#fff5f5;color:#e24b4a;cursor:pointer;white-space:nowrap;margin-top:3px}
 .cancel-btn:active{opacity:.7}
 </style>
@@ -203,6 +252,8 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
     <button class="tab" onclick="showTab('stock')">在庫一覧</button>
     <button class="tab" onclick="showTab('log')">履歴</button>
     <button class="tab" onclick="showTab('reg')">登録商品</button>
+    <button class="tab" onclick="showTab('expcheck')">期限確認</button>
+    <button class="tab" onclick="showTab('expedit')">期限編集</button>
   </div>
 
   <div id="tab-scan">
@@ -281,6 +332,36 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
     <div class="card">
       <div id="reg-list"><div class="loading">読み込み中...</div></div>
     </div>
+  </div>
+
+  <div id="tab-expcheck" style="display:none">
+    <div class="filter-bar">
+      <div class="filter-row">
+        <label>区分</label>
+        <select id="exp-filter-kubun" onchange="renderExpCheck()"><option value="">すべて</option></select>
+      </div>
+      <div class="filter-row">
+        <label>項目</label>
+        <select id="exp-filter-komoku" onchange="renderExpCheck()"><option value="">すべて</option></select>
+      </div>
+    </div>
+    <div id="exp-check-body"><div class="loading">読み込み中...</div></div>
+  </div>
+
+  <div id="tab-expedit" style="display:none">
+    <button class="add-reagent-btn" onclick="openReagent('add')">＋ 試薬を追加</button>
+    <div class="filter-bar">
+      <div class="filter-row">
+        <label>区分</label>
+        <select id="edit-filter-kubun" onchange="renderExpEdit()"><option value="">すべて</option></select>
+      </div>
+      <div class="filter-row">
+        <label>項目</label>
+        <select id="edit-filter-komoku" onchange="renderExpEdit()"><option value="">すべて</option></select>
+      </div>
+    </div>
+    <div class="card"><div id="exp-edit-body"><div class="loading">読み込み中...</div></div></div>
+    <div class="card"><div id="master-box"></div></div>
   </div>
 </div>
 
@@ -380,18 +461,22 @@ async function refreshAll(){
   if(idx===1){buildCat1Options();renderStock();}
   if(idx===2)await loadAndRenderLog();
   if(idx===3)renderRegList();
+  if(idx===4){await loadReagents();await loadReagentMaster();renderExpCheck();}
+  if(idx===5){await loadReagents();await loadReagentMaster();renderExpEdit();}
 }
 
 function showTab(t){
-  ['scan','stock','log','reg'].forEach(id=>{
+  ['scan','stock','log','reg','expcheck','expedit'].forEach(id=>{
     document.getElementById('tab-'+id).style.display=id===t?'':'none';
   });
   document.querySelectorAll('.tab').forEach((el,i)=>{
-    el.classList.toggle('active',['scan','stock','log','reg'][i]===t);
+    el.classList.toggle('active',['scan','stock','log','reg','expcheck','expedit'][i]===t);
   });
   if(t==='stock'){loadProducts().then(()=>{buildCat1Options();renderStock();});}
   if(t==='log')loadAndRenderLog();
   if(t==='reg'){loadProducts().then(renderRegList);}
+  if(t==='expcheck'){Promise.all([loadReagents(),loadReagentMaster()]).then(renderExpCheck);}
+  if(t==='expedit'){Promise.all([loadReagents(),loadReagentMaster()]).then(renderExpEdit);}
   if(t!=='scan')stopCam();
 }
 
@@ -1085,6 +1170,291 @@ async function cancelLog(rowIndex, name, type, qty) {
   } catch(e) {
     toast('通信エラーが発生しました', 'err');
   }
+}
+</script>
+<!-- 試薬編集モーダル -->
+<div class="rg-wrap" id="rg-wrap" onclick="if(event.target===this)closeReagent()">
+  <div class="rg-card">
+    <div class="rg-title" id="rg-title">試薬を追加</div>
+    <div class="rg-row2">
+      <div class="rg-field"><label>区分</label><select id="rg-kubun"></select></div>
+      <div class="rg-field"><label>項目</label><select id="rg-komoku"></select></div>
+    </div>
+    <div class="rg-field"><label>名称</label><input type="text" id="rg-name" placeholder="試薬名"/></div>
+    <div class="rg-field"><label>容器番号（任意）</label><input type="text" id="rg-container" placeholder="容器ブロックのみ"/></div>
+    <div class="rg-row2">
+      <div class="rg-field"><label>期限</label><input type="date" id="rg-expiry"/></div>
+      <div class="rg-field"><label>予備期限（任意）</label><input type="date" id="rg-subexpiry"/></div>
+    </div>
+    <div class="rg-btns">
+      <button class="rg-cancel" onclick="closeReagent()">キャンセル</button>
+      <button class="rg-save" id="rg-save" onclick="saveReagent()">保存</button>
+    </div>
+    <div class="rg-btns" id="rg-delete-row" style="margin-top:8px;display:none">
+      <button class="rg-delete" onclick="deleteReagentConfirm()">この試薬を削除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ 有効期限管理 ═══════════════════════════════════════════
+let reagents=[];
+let reagentMaster={kubun:[],komoku:[]};
+const REAGENT_ICONS={'キャリブレータ':'🎯','試薬':'🧪','コントロール':'🎚️','洗剤':'🧴','容器':'🧫'};
+function rgIcon(k){return REAGENT_ICONS[k]||'📦';}
+const WARN_DAYS=31;
+
+async function loadReagents(){
+  setSync('loading','読み込み中...');
+  try{
+    const data=await api({action:'getReagents'});
+    if(data.error)throw new Error(data.error);
+    reagents=data.reagents||[];
+    setSync('ok','スプレッドシート連携中');
+    return true;
+  }catch(e){setSync('err','接続エラー');return false;}
+}
+async function loadReagentMaster(){
+  try{
+    const data=await api({action:'getReagentMaster'});
+    if(!data.error)reagentMaster={kubun:data.kubun||[],komoku:data.komoku||[]};
+  }catch(e){}
+}
+
+// yyyy-MM-dd → 残日数（未入力はnull）
+function daysUntil(s){
+  if(!s)return null;
+  const m=String(s).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m)return null;
+  const target=new Date(+m[1],+m[2]-1,+m[3]);
+  const today=new Date();today.setHours(0,0,0,0);
+  return Math.floor((target-today)/86400000);
+}
+function daysBadge(d){
+  if(d===null)return '<span class="exp-daysbadge none">未入力</span>';
+  if(d<0)return '<span class="exp-daysbadge danger">期限切れ</span>';
+  if(d===0)return '<span class="exp-daysbadge danger">本日</span>';
+  if(d<=WARN_DAYS)return '<span class="exp-daysbadge warn">あと'+d+'日</span>';
+  return '<span class="exp-daysbadge ok">あと'+d+'日</span>';
+}
+function fillFilterSelect(id,values){
+  const sel=document.getElementById(id);if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">すべて</option>'+values.map(v=>`<option value="${v}">${v}</option>`).join('');
+  if(values.indexOf(cur)!==-1)sel.value=cur;
+}
+
+// ── 期限確認タブ ──
+function renderExpCheck(){
+  fillFilterSelect('exp-filter-kubun',reagentMaster.kubun);
+  fillFilterSelect('exp-filter-komoku',reagentMaster.komoku);
+  const fk=document.getElementById('exp-filter-kubun').value;
+  const fm=document.getElementById('exp-filter-komoku').value;
+  const el=document.getElementById('exp-check-body');
+  let list=reagents.slice();
+  if(fk)list=list.filter(r=>r.kubun===fk);
+  if(fm)list=list.filter(r=>r.komoku===fm);
+  if(!list.length){el.innerHTML='<div class="card"><div class="empty">該当する試薬がありません</div></div>';return;}
+
+  list.forEach(r=>{r._d=daysUntil(r.expiry);});
+  const expired=list.filter(r=>r._d!==null&&r._d<0).sort((a,b)=>a._d-b._d);
+  const soon=list.filter(r=>r._d!==null&&r._d>=0&&r._d<=WARN_DAYS).sort((a,b)=>a._d-b._d);
+  const fine=list.filter(r=>r._d!==null&&r._d>WARN_DAYS).sort((a,b)=>a._d-b._d);
+  const none=list.filter(r=>r._d===null);
+
+  let html=`<div class="exp-summary">
+    <div class="exp-stat danger"><div class="num">${expired.length}</div><div class="lbl">期限切れ</div></div>
+    <div class="exp-stat warn"><div class="num">${soon.length}</div><div class="lbl">${WARN_DAYS}日以内</div></div>
+    <div class="exp-stat ok"><div class="num">${fine.length}</div><div class="lbl">余裕あり</div></div>
+  </div>`;
+
+  const urgent=expired.concat(soon);
+  if(urgent.length)html+='<div class="card">'+urgent.map(expRow).join('')+'</div>';
+  else html+='<div class="card"><div class="empty">⚠️ 要注意の試薬はありません</div></div>';
+
+  const rest=fine.concat(none);
+  if(rest.length){
+    html+=`<button class="exp-toggle" id="exp-toggle-btn" onclick="toggleExpRest()">▼ 期限に余裕のある試薬を表示（${rest.length}件）</button>`;
+    html+=`<div class="card" id="exp-rest" style="display:none">`;
+    if(fine.length)html+=fine.map(expRow).join('');
+    if(none.length)html+='<div class="exp-section-label">期限未入力</div>'+none.map(expRow).join('');
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+function expRow(r){
+  const sub=[r.kubun,r.komoku].filter(Boolean).join(' / ');
+  const subExp=r.subExpiry?` <span class="sub">／予備: ${r.subExpiry}</span>`:'';
+  const cont=r.container?` <span style="color:#aaa;font-size:11px">[${r.container}]</span>`:'';
+  return `<div class="exp-item">
+    <div class="exp-info">
+      <div class="exp-name">${rgIcon(r.kubun)} ${r.name}${cont}</div>
+      <div class="exp-meta">${sub}</div>
+      <div class="exp-date">期限: ${r.expiry||'—'}${subExp}</div>
+    </div>
+    ${daysBadge(r._d)}
+  </div>`;
+}
+function toggleExpRest(){
+  const el=document.getElementById('exp-rest');
+  const btn=document.getElementById('exp-toggle-btn');
+  if(!el||!btn)return;
+  if(el.style.display==='none'){el.style.display='';btn.textContent=btn.textContent.replace('▼','▲');}
+  else{el.style.display='none';btn.textContent=btn.textContent.replace('▲','▼');}
+}
+
+// ── 期限編集タブ ──
+function renderExpEdit(){
+  fillFilterSelect('edit-filter-kubun',reagentMaster.kubun);
+  fillFilterSelect('edit-filter-komoku',reagentMaster.komoku);
+  const fk=document.getElementById('edit-filter-kubun').value;
+  const fm=document.getElementById('edit-filter-komoku').value;
+  const el=document.getElementById('exp-edit-body');
+  renderMasterBox();
+  if(!reagents.length){el.innerHTML='<div class="empty">試薬がまだ登録されていません</div>';return;}
+  let list=reagents.slice();
+  if(fk)list=list.filter(r=>r.kubun===fk);
+  if(fm)list=list.filter(r=>r.komoku===fm);
+  if(!list.length){el.innerHTML='<div class="empty">該当する試薬がありません</div>';return;}
+
+  list.sort((a,b)=>{
+    const k=(a.kubun||'').localeCompare(b.kubun||'','ja');if(k!==0)return k;
+    const m=(a.komoku||'').localeCompare(b.komoku||'','ja');if(m!==0)return m;
+    return (a.name||'').localeCompare(b.name||'','ja');
+  });
+  const counts={};
+  list.forEach(r=>{const k=r.kubun||'（未分類）';counts[k]=(counts[k]||0)+1;});
+  let html='';let cur=null;
+  list.forEach(r=>{
+    const k=r.kubun||'（未分類）';
+    if(k!==cur){cur=k;html+=`<div class="group-head"><span class="group-icon">${rgIcon(r.kubun)}</span><span class="group-name">${k}</span><span class="group-count">${counts[k]}</span></div>`;}
+    const cont=r.container?` <span style="color:#aaa;font-size:11px">[${r.container}]</span>`:'';
+    const subExp=r.subExpiry?` <span class="sub">／予備: ${r.subExpiry}</span>`:'';
+    html+=`<div class="exp-item">
+      <div class="exp-info">
+        <div class="exp-name">${r.name}${cont}</div>
+        <div class="exp-meta">${r.komoku||''}</div>
+        <div class="exp-date">期限: ${r.expiry||'—'}${subExp}</div>
+      </div>
+      <button class="edit-btn" onclick="openReagent('edit','${r.id}')">✏️ 編集</button>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+// ── マスタ管理 ──
+function renderMasterBox(){
+  const el=document.getElementById('master-box');if(!el)return;
+  el.innerHTML=`
+    <div class="exp-section-label" style="margin-top:0">区分・項目の管理</div>
+    <div class="master-group">
+      <h4>区分</h4>
+      <div class="chips">${reagentMaster.kubun.map(v=>chip('kubun',v)).join('')||'<span style="color:#aaa;font-size:12px">なし</span>'}</div>
+      <div class="master-add"><input type="text" id="add-kubun-input" placeholder="新しい区分"/><button onclick="addMaster('kubun')">追加</button></div>
+    </div>
+    <div class="master-group">
+      <h4>項目</h4>
+      <div class="chips">${reagentMaster.komoku.map(v=>chip('komoku',v)).join('')||'<span style="color:#aaa;font-size:12px">なし</span>'}</div>
+      <div class="master-add"><input type="text" id="add-komoku-input" placeholder="新しい項目"/><button onclick="addMaster('komoku')">追加</button></div>
+    </div>`;
+}
+function chip(field,v){
+  const safe=String(v).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+  return `<span class="chip">${v}<button onclick="deleteMaster('${field}','${safe}')">✕</button></span>`;
+}
+async function addMaster(field){
+  const input=document.getElementById('add-'+field+'-input');
+  const val=input.value.trim();if(!val)return;
+  try{
+    const data=await api({action:'addReagentMaster',field,value:val});
+    if(data.error){toast(data.error,'err');return;}
+    input.value='';
+    await loadReagentMaster();renderExpEdit();
+    toast((field==='kubun'?'区分':'項目')+'「'+val+'」を追加','in');
+  }catch(e){toast('通信エラーが発生しました','err');}
+}
+async function deleteMaster(field,val){
+  if(!confirm('「'+val+'」を削除しますか？\n（登録済みの試薬データ自体は消えません）'))return;
+  try{
+    const data=await api({action:'deleteReagentMaster',field,value:val});
+    if(data.error){toast(data.error,'err');return;}
+    await loadReagentMaster();renderExpEdit();
+    toast('「'+val+'」を削除','out');
+  }catch(e){toast('通信エラーが発生しました','err');}
+}
+
+// ── 試薬の追加・編集モーダル ──
+let rgMode='add',rgEditId=null;
+function normForInput(s){
+  if(!s)return '';
+  const m=String(s).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m)return '';
+  return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+}
+function openReagent(mode,id){
+  rgMode=mode;rgEditId=id||null;
+  document.getElementById('rg-kubun').innerHTML=reagentMaster.kubun.map(v=>`<option value="${v}">${v}</option>`).join('');
+  document.getElementById('rg-komoku').innerHTML=reagentMaster.komoku.map(v=>`<option value="${v}">${v}</option>`).join('');
+  if(mode==='edit'){
+    const r=reagents.find(x=>String(x.id)===String(id));if(!r)return;
+    document.getElementById('rg-title').textContent='試薬を編集';
+    document.getElementById('rg-kubun').value=r.kubun||'';
+    document.getElementById('rg-komoku').value=r.komoku||'';
+    document.getElementById('rg-name').value=r.name||'';
+    document.getElementById('rg-container').value=r.container||'';
+    document.getElementById('rg-expiry').value=normForInput(r.expiry);
+    document.getElementById('rg-subexpiry').value=normForInput(r.subExpiry);
+    document.getElementById('rg-delete-row').style.display='';
+  }else{
+    document.getElementById('rg-title').textContent='試薬を追加';
+    document.getElementById('rg-kubun').selectedIndex=0;
+    document.getElementById('rg-komoku').selectedIndex=0;
+    document.getElementById('rg-name').value='';
+    document.getElementById('rg-container').value='';
+    document.getElementById('rg-expiry').value='';
+    document.getElementById('rg-subexpiry').value='';
+    document.getElementById('rg-delete-row').style.display='none';
+  }
+  document.getElementById('rg-wrap').classList.add('open');
+}
+function closeReagent(){document.getElementById('rg-wrap').classList.remove('open');}
+async function saveReagent(){
+  const name=document.getElementById('rg-name').value.trim();
+  if(!name){toast('名称を入力してください','err');return;}
+  const payload={
+    kubun:document.getElementById('rg-kubun').value,
+    komoku:document.getElementById('rg-komoku').value,
+    name,
+    container:document.getElementById('rg-container').value.trim(),
+    expiry:document.getElementById('rg-expiry').value,
+    subExpiry:document.getElementById('rg-subexpiry').value
+  };
+  document.getElementById('rg-save').disabled=true;
+  try{
+    const data=rgMode==='edit'
+      ? await api({action:'updateReagent',id:rgEditId,...payload})
+      : await api({action:'addReagent',...payload});
+    if(data.error){toast(data.error,'err');}
+    else{
+      toast(name+(rgMode==='edit'?' を更新':' を追加'),'in');
+      closeReagent();
+      await loadReagents();renderExpEdit();
+    }
+  }catch(e){toast('通信エラーが発生しました','err');}
+  document.getElementById('rg-save').disabled=false;
+}
+async function deleteReagentConfirm(){
+  if(!rgEditId)return;
+  const r=reagents.find(x=>String(x.id)===String(rgEditId));
+  const nm=r?r.name:'';
+  if(!confirm((nm||'この試薬')+' を削除しますか？'))return;
+  try{
+    const data=await api({action:'deleteReagent',id:rgEditId});
+    if(data.error){toast(data.error,'err');return;}
+    toast((nm||'試薬')+' を削除','out');
+    closeReagent();
+    await loadReagents();renderExpEdit();
+  }catch(e){toast('通信エラーが発生しました','err');}
 }
 </script>
 </body>
