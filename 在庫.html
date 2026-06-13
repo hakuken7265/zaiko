@@ -197,6 +197,13 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
 .edit-btn:active{opacity:.7}
 .add-reagent-btn{width:100%;padding:12px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px}
 .add-reagent-btn:active{opacity:.85}
+.exp-note{font-size:12px;color:#888;background:#f5f7fa;border:1px solid #e0e4ea;border-radius:10px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+.rg-name-disp{font-size:14px;margin-bottom:14px;line-height:1.4}
+.rg-name-disp span{color:#888;font-size:12px}
+.rg-promote{margin:4px 0 14px}
+.rg-promote-btn{width:100%;padding:11px;background:#fff7e6;color:#b35c00;border:1px solid #f0c98a;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+.rg-promote-btn:active{opacity:.8}
+.rg-promote-hint{font-size:11px;color:#999;margin-top:6px;line-height:1.4}
 /* 試薬編集モーダル */
 .rg-wrap{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:9000}
 .rg-wrap.open{display:flex}
@@ -349,7 +356,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
   </div>
 
   <div id="tab-expedit" style="display:none">
-    <button class="add-reagent-btn" onclick="openReagent('add')">＋ 試薬を追加</button>
+    <div class="exp-note">試薬の追加・削除はスプレッドシートで行います。ここでは期限の編集・繰り上げができます。</div>
     <div class="filter-bar">
       <div class="filter-row">
         <label>区分</label>
@@ -361,7 +368,6 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
       </div>
     </div>
     <div class="card"><div id="exp-edit-body"><div class="loading">読み込み中...</div></div></div>
-    <div class="card"><div id="master-box"></div></div>
   </div>
 </div>
 
@@ -461,8 +467,8 @@ async function refreshAll(){
   if(idx===1){buildCat1Options();renderStock();}
   if(idx===2)await loadAndRenderLog();
   if(idx===3)renderRegList();
-  if(idx===4){await loadReagents();await loadReagentMaster();renderExpCheck();}
-  if(idx===5){await loadReagents();await loadReagentMaster();renderExpEdit();}
+  if(idx===4){await loadReagents();renderExpCheck();}
+  if(idx===5){await loadReagents();renderExpEdit();}
 }
 
 function showTab(t){
@@ -475,8 +481,8 @@ function showTab(t){
   if(t==='stock'){loadProducts().then(()=>{buildCat1Options();renderStock();});}
   if(t==='log')loadAndRenderLog();
   if(t==='reg'){loadProducts().then(renderRegList);}
-  if(t==='expcheck'){Promise.all([loadReagents(),loadReagentMaster()]).then(renderExpCheck);}
-  if(t==='expedit'){Promise.all([loadReagents(),loadReagentMaster()]).then(renderExpEdit);}
+  if(t==='expcheck'){loadReagents().then(renderExpCheck);}
+  if(t==='expedit'){loadReagents().then(renderExpEdit);}
   if(t!=='scan')stopCam();
 }
 
@@ -1175,23 +1181,19 @@ async function cancelLog(rowIndex, name, type, qty) {
 <!-- 試薬編集モーダル -->
 <div class="rg-wrap" id="rg-wrap" onclick="if(event.target===this)closeReagent()">
   <div class="rg-card">
-    <div class="rg-title" id="rg-title">試薬を追加</div>
-    <div class="rg-row2">
-      <div class="rg-field"><label>区分</label><select id="rg-kubun"></select></div>
-      <div class="rg-field"><label>項目</label><select id="rg-komoku"></select></div>
-    </div>
-    <div class="rg-field"><label>名称</label><input type="text" id="rg-name" placeholder="試薬名"/></div>
-    <div class="rg-field"><label>容器番号（任意）</label><input type="text" id="rg-container" placeholder="容器ブロックのみ"/></div>
+    <div class="rg-title" id="rg-title">期限を編集</div>
+    <div class="rg-name-disp" id="rg-name-disp"></div>
     <div class="rg-row2">
       <div class="rg-field"><label>期限</label><input type="date" id="rg-expiry"/></div>
       <div class="rg-field"><label>予備期限（任意）</label><input type="date" id="rg-subexpiry"/></div>
     </div>
+    <div class="rg-promote" id="rg-promote-row" style="display:none">
+      <button class="rg-promote-btn" onclick="promoteReagentAction()">⤴ 予備期限を期限へ繰り上げる</button>
+      <div class="rg-promote-hint">予備の試薬を開封したらこれを押すと、予備期限が期限に移り、予備期限が空になります。</div>
+    </div>
     <div class="rg-btns">
       <button class="rg-cancel" onclick="closeReagent()">キャンセル</button>
       <button class="rg-save" id="rg-save" onclick="saveReagent()">保存</button>
-    </div>
-    <div class="rg-btns" id="rg-delete-row" style="margin-top:8px;display:none">
-      <button class="rg-delete" onclick="deleteReagentConfirm()">この試薬を削除</button>
     </div>
   </div>
 </div>
@@ -1199,7 +1201,6 @@ async function cancelLog(rowIndex, name, type, qty) {
 <script>
 // ══ 有効期限管理 ═══════════════════════════════════════════
 let reagents=[];
-let reagentMaster={kubun:[],komoku:[]};
 const REAGENT_ICONS={'キャリブレータ':'🎯','試薬':'🧪','コントロール':'🎚️','洗剤':'🧴','容器':'🧫'};
 function rgIcon(k){return REAGENT_ICONS[k]||'📦';}
 const WARN_DAYS=31;
@@ -1214,12 +1215,9 @@ async function loadReagents(){
     return true;
   }catch(e){setSync('err','接続エラー');return false;}
 }
-async function loadReagentMaster(){
-  try{
-    const data=await api({action:'getReagentMaster'});
-    if(!data.error)reagentMaster={kubun:data.kubun||[],komoku:data.komoku||[]};
-  }catch(e){}
-}
+// 区分・項目の候補を実データから生成
+function reagentKubunList(){return [...new Set(reagents.map(r=>r.kubun).filter(v=>v!==''&&v!=null))].sort((a,b)=>String(a).localeCompare(String(b),'ja'));}
+function reagentKomokuList(){return [...new Set(reagents.map(r=>r.komoku).filter(v=>v!==''&&v!=null))].sort((a,b)=>String(a).localeCompare(String(b),'ja'));}
 
 // yyyy-MM-dd → 残日数（未入力はnull）
 function daysUntil(s){
@@ -1246,8 +1244,8 @@ function fillFilterSelect(id,values){
 
 // ── 期限確認タブ ──
 function renderExpCheck(){
-  fillFilterSelect('exp-filter-kubun',reagentMaster.kubun);
-  fillFilterSelect('exp-filter-komoku',reagentMaster.komoku);
+  fillFilterSelect('exp-filter-kubun',reagentKubunList());
+  fillFilterSelect('exp-filter-komoku',reagentKomokuList());
   const fk=document.getElementById('exp-filter-kubun').value;
   const fm=document.getElementById('exp-filter-komoku').value;
   const el=document.getElementById('exp-check-body');
@@ -1285,10 +1283,9 @@ function renderExpCheck(){
 function expRow(r){
   const sub=[r.kubun,r.komoku].filter(Boolean).join(' / ');
   const subExp=r.subExpiry?` <span class="sub">／予備: ${r.subExpiry}</span>`:'';
-  const cont=r.container?` <span style="color:#aaa;font-size:11px">[${r.container}]</span>`:'';
   return `<div class="exp-item">
     <div class="exp-info">
-      <div class="exp-name">${rgIcon(r.kubun)} ${r.name}${cont}</div>
+      <div class="exp-name">${rgIcon(r.kubun)} ${r.name}</div>
       <div class="exp-meta">${sub}</div>
       <div class="exp-date">期限: ${r.expiry||'—'}${subExp}</div>
     </div>
@@ -1305,12 +1302,11 @@ function toggleExpRest(){
 
 // ── 期限編集タブ ──
 function renderExpEdit(){
-  fillFilterSelect('edit-filter-kubun',reagentMaster.kubun);
-  fillFilterSelect('edit-filter-komoku',reagentMaster.komoku);
+  fillFilterSelect('edit-filter-kubun',reagentKubunList());
+  fillFilterSelect('edit-filter-komoku',reagentKomokuList());
   const fk=document.getElementById('edit-filter-kubun').value;
   const fm=document.getElementById('edit-filter-komoku').value;
   const el=document.getElementById('exp-edit-body');
-  renderMasterBox();
   if(!reagents.length){el.innerHTML='<div class="empty">試薬がまだ登録されていません</div>';return;}
   let list=reagents.slice();
   if(fk)list=list.filter(r=>r.kubun===fk);
@@ -1328,130 +1324,66 @@ function renderExpEdit(){
   list.forEach(r=>{
     const k=r.kubun||'（未分類）';
     if(k!==cur){cur=k;html+=`<div class="group-head"><span class="group-icon">${rgIcon(r.kubun)}</span><span class="group-name">${k}</span><span class="group-count">${counts[k]}</span></div>`;}
-    const cont=r.container?` <span style="color:#aaa;font-size:11px">[${r.container}]</span>`:'';
     const subExp=r.subExpiry?` <span class="sub">／予備: ${r.subExpiry}</span>`:'';
     html+=`<div class="exp-item">
       <div class="exp-info">
-        <div class="exp-name">${r.name}${cont}</div>
+        <div class="exp-name">${r.name}</div>
         <div class="exp-meta">${r.komoku||''}</div>
         <div class="exp-date">期限: ${r.expiry||'—'}${subExp}</div>
       </div>
-      <button class="edit-btn" onclick="openReagent('edit','${r.id}')">✏️ 編集</button>
+      <button class="edit-btn" onclick="openReagent(${r.row})">✏️ 編集</button>
     </div>`;
   });
   el.innerHTML=html;
 }
 
-// ── マスタ管理 ──
-function renderMasterBox(){
-  const el=document.getElementById('master-box');if(!el)return;
-  el.innerHTML=`
-    <div class="exp-section-label" style="margin-top:0">区分・項目の管理</div>
-    <div class="master-group">
-      <h4>区分</h4>
-      <div class="chips">${reagentMaster.kubun.map(v=>chip('kubun',v)).join('')||'<span style="color:#aaa;font-size:12px">なし</span>'}</div>
-      <div class="master-add"><input type="text" id="add-kubun-input" placeholder="新しい区分"/><button onclick="addMaster('kubun')">追加</button></div>
-    </div>
-    <div class="master-group">
-      <h4>項目</h4>
-      <div class="chips">${reagentMaster.komoku.map(v=>chip('komoku',v)).join('')||'<span style="color:#aaa;font-size:12px">なし</span>'}</div>
-      <div class="master-add"><input type="text" id="add-komoku-input" placeholder="新しい項目"/><button onclick="addMaster('komoku')">追加</button></div>
-    </div>`;
-}
-function chip(field,v){
-  const safe=String(v).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
-  return `<span class="chip">${v}<button onclick="deleteMaster('${field}','${safe}')">✕</button></span>`;
-}
-async function addMaster(field){
-  const input=document.getElementById('add-'+field+'-input');
-  const val=input.value.trim();if(!val)return;
-  try{
-    const data=await api({action:'addReagentMaster',field,value:val});
-    if(data.error){toast(data.error,'err');return;}
-    input.value='';
-    await loadReagentMaster();renderExpEdit();
-    toast((field==='kubun'?'区分':'項目')+'「'+val+'」を追加','in');
-  }catch(e){toast('通信エラーが発生しました','err');}
-}
-async function deleteMaster(field,val){
-  if(!confirm('「'+val+'」を削除しますか？\n（登録済みの試薬データ自体は消えません）'))return;
-  try{
-    const data=await api({action:'deleteReagentMaster',field,value:val});
-    if(data.error){toast(data.error,'err');return;}
-    await loadReagentMaster();renderExpEdit();
-    toast('「'+val+'」を削除','out');
-  }catch(e){toast('通信エラーが発生しました','err');}
-}
-
-// ── 試薬の追加・編集モーダル ──
-let rgMode='add',rgEditId=null;
+// ── 期限の編集・繰り上げモーダル ──
+let rgEditRow=null;
 function normForInput(s){
   if(!s)return '';
   const m=String(s).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if(!m)return '';
   return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
 }
-function openReagent(mode,id){
-  rgMode=mode;rgEditId=id||null;
-  document.getElementById('rg-kubun').innerHTML=reagentMaster.kubun.map(v=>`<option value="${v}">${v}</option>`).join('');
-  document.getElementById('rg-komoku').innerHTML=reagentMaster.komoku.map(v=>`<option value="${v}">${v}</option>`).join('');
-  if(mode==='edit'){
-    const r=reagents.find(x=>String(x.id)===String(id));if(!r)return;
-    document.getElementById('rg-title').textContent='試薬を編集';
-    document.getElementById('rg-kubun').value=r.kubun||'';
-    document.getElementById('rg-komoku').value=r.komoku||'';
-    document.getElementById('rg-name').value=r.name||'';
-    document.getElementById('rg-container').value=r.container||'';
-    document.getElementById('rg-expiry').value=normForInput(r.expiry);
-    document.getElementById('rg-subexpiry').value=normForInput(r.subExpiry);
-    document.getElementById('rg-delete-row').style.display='';
-  }else{
-    document.getElementById('rg-title').textContent='試薬を追加';
-    document.getElementById('rg-kubun').selectedIndex=0;
-    document.getElementById('rg-komoku').selectedIndex=0;
-    document.getElementById('rg-name').value='';
-    document.getElementById('rg-container').value='';
-    document.getElementById('rg-expiry').value='';
-    document.getElementById('rg-subexpiry').value='';
-    document.getElementById('rg-delete-row').style.display='none';
-  }
+function openReagent(row){
+  const r=reagents.find(x=>x.row===row);if(!r)return;
+  rgEditRow=row;
+  const sub=[r.kubun,r.komoku].filter(Boolean).join(' / ');
+  document.getElementById('rg-name-disp').innerHTML=`<strong>${r.name}</strong>`+(sub?`<span>　${sub}</span>`:'');
+  document.getElementById('rg-expiry').value=normForInput(r.expiry);
+  document.getElementById('rg-subexpiry').value=normForInput(r.subExpiry);
+  document.getElementById('rg-promote-row').style.display=r.subExpiry?'':'none';
   document.getElementById('rg-wrap').classList.add('open');
 }
 function closeReagent(){document.getElementById('rg-wrap').classList.remove('open');}
 async function saveReagent(){
-  const name=document.getElementById('rg-name').value.trim();
-  if(!name){toast('名称を入力してください','err');return;}
+  if(!rgEditRow)return;
   const payload={
-    kubun:document.getElementById('rg-kubun').value,
-    komoku:document.getElementById('rg-komoku').value,
-    name,
-    container:document.getElementById('rg-container').value.trim(),
+    action:'updateReagent',
+    row:rgEditRow,
     expiry:document.getElementById('rg-expiry').value,
     subExpiry:document.getElementById('rg-subexpiry').value
   };
   document.getElementById('rg-save').disabled=true;
   try{
-    const data=rgMode==='edit'
-      ? await api({action:'updateReagent',id:rgEditId,...payload})
-      : await api({action:'addReagent',...payload});
+    const data=await api(payload);
     if(data.error){toast(data.error,'err');}
     else{
-      toast(name+(rgMode==='edit'?' を更新':' を追加'),'in');
+      toast('期限を更新しました','in');
       closeReagent();
       await loadReagents();renderExpEdit();
     }
   }catch(e){toast('通信エラーが発生しました','err');}
   document.getElementById('rg-save').disabled=false;
 }
-async function deleteReagentConfirm(){
-  if(!rgEditId)return;
-  const r=reagents.find(x=>String(x.id)===String(rgEditId));
-  const nm=r?r.name:'';
-  if(!confirm((nm||'この試薬')+' を削除しますか？'))return;
+async function promoteReagentAction(){
+  if(!rgEditRow)return;
+  const r=reagents.find(x=>x.row===rgEditRow);
+  if(!confirm((r?r.name:'この試薬')+' の予備期限（'+(r?r.subExpiry:'')+'）を期限へ繰り上げますか？\n現在の期限は上書きされます。'))return;
   try{
-    const data=await api({action:'deleteReagent',id:rgEditId});
+    const data=await api({action:'promoteReagent',row:rgEditRow});
     if(data.error){toast(data.error,'err');return;}
-    toast((nm||'試薬')+' を削除','out');
+    toast('予備期限を繰り上げました','in');
     closeReagent();
     await loadReagents();renderExpEdit();
   }catch(e){toast('通信エラーが発生しました','err');}
