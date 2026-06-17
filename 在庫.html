@@ -300,6 +300,7 @@ h1{font-size:17px;font-weight:600;padding:12px 0 10px;color:#1a1a1a;text-align:c
         <div id="selected-name" style="font-size:16px;font-weight:700;color:#bbb">未選択</div>
         <div id="selected-sub" style="font-size:11px;color:#bbb;margin-top:3px"></div>
         <div id="selected-stock" style="font-size:13px;font-weight:600;color:#bbb;margin-top:4px"></div>
+        <div id="selected-order" style="font-size:12px;font-weight:500;color:#2255cc;margin-top:5px;display:none"></div>
       </div>
       <div class="qty-row">
         <label>数量</label>
@@ -479,6 +480,7 @@ function setSelectedBox(p){
   const nameEl=document.getElementById('selected-name');
   const subEl=document.getElementById('selected-sub');
   const stockEl=document.getElementById('selected-stock');
+  const orderEl=document.getElementById('selected-order');
   if(p){
     nameEl.textContent=p.name;
     nameEl.style.color='#0F6E56';
@@ -487,6 +489,12 @@ function setSelectedBox(p){
     subEl.style.color='#888';
     stockEl.textContent='現在庫: '+p.stock+' 個';
     stockEl.style.color='#333';
+    if(p.order){
+      orderEl.textContent='🛒 '+p.order;
+      orderEl.style.display='';
+    }else{
+      orderEl.style.display='none';
+    }
     box.style.borderColor='#1D9E75';
     box.style.background='#eef6f2';
   }else{
@@ -494,6 +502,7 @@ function setSelectedBox(p){
     nameEl.style.color='#bbb';
     subEl.textContent='';
     stockEl.textContent='';
+    orderEl.style.display='none';
     box.style.borderColor='#e0e0e0';
     box.style.background='#fafafa';
   }
