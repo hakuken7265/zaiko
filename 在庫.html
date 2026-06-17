@@ -487,8 +487,9 @@ function setSelectedBox(p){
     const sub=[p.category1,p.category2,p.spec].filter(Boolean).join(' / ');
     subEl.textContent=sub ? 'JAN: '+p.jan+' / '+sub : 'JAN: '+p.jan;
     subEl.style.color='#888';
-    stockEl.textContent='現在庫: '+p.stock+' 個';
-    stockEl.style.color='#333';
+    const low = p.stock <= p.safe;
+    stockEl.textContent = '現在庫: ' + p.stock + ' 個' + (low ? ' ⚠️' : '');
+    stockEl.style.color = low ? '#e24b4a' : '#333';
     if(p.order){
       orderEl.textContent='🛒 '+p.order;
       orderEl.style.display='';
